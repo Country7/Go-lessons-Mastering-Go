@@ -1,0 +1,71 @@
+----------------------------------------------------------
+Чтение стандартного потока ввода stdIN.go
+
+  $ go run stdIN.go
+  This is number 21
+  > This is number 21
+
+----------------------------------------------------------
+Работа с аргументами командной строки cla.go
+
+  $ go run cla.go -10 0 1
+  Min: -10
+  Max: 1
+
+----------------------------------------------------------
+Вывод ошибок stdERR.go
+
+  $ go run stdERR.go
+  This is Standard output
+  Please give me one argument!
+
+  При применении bash(1) можно перенаправить стандартный поток ошибок в файл:
+  $ go run stdERR.go 2>/tmp/stdError
+  This is Standard output
+  $ cat /tmp/stdError
+  Please give me one argument!
+
+  перенаправив их на устройство /dev/null
+  $ go run stdERR.go 2>/dev/null
+  This is Standard output
+
+  сохранить данные стандартного потока вывода и стандартного потока ошибок в 
+  одном файле, то можете перенаправить файловый дескриптор стандартного потока
+  ошибок (2) в файловый дескриптор стандартного потока вывода (1).
+  $ go run stdERR.go >/tmp/output 2>&1
+  $ cat /tmp/output
+  This is Standard output
+  Please give me one argument!
+
+  можно перенаправить и стандартный поток вывода, и стандартный
+  поток ошибок на /dev/null:
+  $ go run stdERR.go >/dev/null 2>&1
+
+----------------------------------------------------------
+Запись в журнальные файлы logFiles.go
+Уровень журналирования: debug, info, notice, warning, err, crit, alert и emerg
+Средство журналирования: auth, authpriv, cron, daemon, kern, lpr, mail, mark, 
+news, syslog, user, UUCP, local0, local1, local2, local3, local4, local5, 
+local6 или local7 и определяется в файле /etc/syslog.conf, /etc/rsyslog.conf 
+или другом соответствующем файле, в зависимости от процесса сервера, используемого 
+для ведения журнала в операционной системе на данной UNIX-машине
+Серверы журналирования: UNIX: syslogd(8) и rsyslogd(8). macOS: syslogd(8)
+Файл конфигурации rsyslogd(8) обычно называется rsyslog.conf и находится в /etc
+
+  $ go run logFiles.go
+  > Will you see this?
+  > Broadcast message from systemd-journald@vadim (Tue 2023-05-30 17:20:41 MSK):
+  > [116416]: Some program![116416]: 2023/05/30 17:20:41 LOG_MAIL: Logging in Go!
+
+  $ grep LOG_MAIL /var/log/mail.log
+  May 30 17:20:41 vadim Some program![116416]: 2023/05/30 17:20:41 LOG_MAIL: Logging in Go!
+
+$ grep LOG_LOCAL7 /var/log/cisco.log
+grep: /var/log/cisco.log: Нет такого файла или каталога
+
+$ grep LOG_ /var/log/syslog
+May 30 17:20:41 vadim logFiles[116416]: 2023/05/30 17:20:41 LOG_INFO + LOG_LOCAL7: Logging in Go!
+May 30 17:20:41 vadim Some program![116416]: 2023/05/30 17:20:41 LOG_MAIL: Logging in Go!
+
+стр. 53
+

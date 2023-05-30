@@ -60,12 +60,47 @@ local6 или local7 и определяется в файле /etc/syslog.conf,
   $ grep LOG_MAIL /var/log/mail.log
   May 30 17:20:41 vadim Some program![116416]: 2023/05/30 17:20:41 LOG_MAIL: Logging in Go!
 
-$ grep LOG_LOCAL7 /var/log/cisco.log
-grep: /var/log/cisco.log: Нет такого файла или каталога
+  $ grep LOG_LOCAL7 /var/log/cisco.log
+  grep: /var/log/cisco.log: Нет такого файла или каталога
 
-$ grep LOG_ /var/log/syslog
-May 30 17:20:41 vadim logFiles[116416]: 2023/05/30 17:20:41 LOG_INFO + LOG_LOCAL7: Logging in Go!
-May 30 17:20:41 vadim Some program![116416]: 2023/05/30 17:20:41 LOG_MAIL: Logging in Go!
+  $ grep LOG_ /var/log/syslog
+  May 30 17:20:41 vadim logFiles[116416]: 2023/05/30 17:20:41 LOG_INFO + LOG_LOCAL7: Logging in Go!
+  May 30 17:20:41 vadim Some program![116416]: 2023/05/30 17:20:41 LOG_MAIL: Logging in Go!
 
-стр. 53
+Функция log.Fatal() logFatal.go
 
+  $ go run logFatal.go
+  exit status 1
+
+Функция log.Panic() logPanic.go
+$ go run logPanic.go
+  panic: &{17 Some program! MacBook-Pro-Country.local   {0 0} 0x1400000c108}
+  goroutine 1 [running]:
+  log.Panic({0x1400010df58?, 0x100c4b948?, 0x1400005e180?})
+    /usr/local/go/src/log/log.go:384 +0x64
+  main.main()
+    /Users/country/MyProjects/Go_project/src/Mastering-Go/ch01-Go-and-OS/logPanic.go:17 +0xb8
+  exit status 2
+
+log.Fatal(), функция log.Panic() добавит запись в соответствующий файл журнала 
+и немедленно прекратит работу Go-программы
+
+----------------------------------------------------------
+Запись в специальный журнальный файл customLog.go
+
+  $ go run customLog.go
+  $ cat /tmp/mGo.log
+  customLog 2023/05/30 21:01:50 Hello there!
+  customLog 2023/05/30 21:01:50 Another log entry!
+
+----------------------------------------------------------
+Вывод номеров строк в записях журнала customLogLineNumber.go
+
+  $ go run customLogLineNumber.go
+  $ cat /tmp/mGo.log
+  customLogLineNumber 2023/05/30 21:09:04 customLogLineNumber.go:26: Hello there!
+  customLogLineNumber 2023/05/30 21:09:04 customLogLineNumber.go:27: Another log entry!
+
+
+----------------------------------------------------------
+Обработка ошибок в Go

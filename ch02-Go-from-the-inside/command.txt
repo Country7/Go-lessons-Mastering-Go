@@ -1,0 +1,10 @@
+ Go изнутри
+
+----------------------------------------------------------
+Компилятор Go
+
+$ go tool compile unsafe.go
+$ go tool compile -I /usr/local/go unsafe.go
+$ go tool compile -I /usr/local/go/src/fmt unsafe.go
+
+page 71

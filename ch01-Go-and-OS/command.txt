@@ -103,4 +103,60 @@ log.Fatal(), функция log.Panic() добавит запись в соот�
 
 
 ----------------------------------------------------------
-Обработка ошибок в Go
+Обработка ошибок в Go newError.go
+
+  $ go run newError.go
+  returnError() ended normally!
+  Error in returnError() function!
+  !!
+
+Не только обрабатывает сообщения об ошибках, но и создает
+собственное сообщение об ошибке. errors.go
+
+  $ go run errors.go a b c
+  None of the arguments is a float!
+
+  $ go run errors.go b c 1 2 3 c -1 100 -200 a
+  Min: -200
+  Max: 100
+
+----------------------------------------------------------
+Использование Docker  hw.go
+
+Dockerfile
+  FROM golang:alpine
+  RUN mkdir /files
+  COPY hw.go /files
+  WORKDIR /files
+  RUN go build -o /files/hw hw.go
+  ENTRYPOINT ["/files/hw"]
+
+  $ docker build -t go_hw:v1 .
+  Sending build context to Docker daemon  22.53kB
+  Step 1/6 : FROM golang:alpine
+  ...
+  Successfully built 69267b86fc01
+  Successfully tagged go_hw:v1
+
+Для проверки образа
+  $ docker images
+  EPOSITORY     TAG       IMAGE ID       CREATED         SIZE
+  go_hw          v1        69267b86fc01   3 minutes ago   281MB
+
+Выполнение образа
+  $ docker run go_hw:v1
+  Hello World!
+
+Отправить образ на Docker Hub
+  $ docker login
+  Authenticating with existing credentials...
+  Login Succeeded
+  $ docker tag go_hw:v1 "mactsouk/go_hw:v1"
+  $ docker push "mactsouk/go_hw:v1"
+
+Удаление образа с UNIX машины 
+$ docker rmi 69267b86fc01
+
+
+
+

@@ -1,10 +1,80 @@
  Go изнутри
 
 ----------------------------------------------------------
-Компилятор Go
+Компилятор Go  unsafe.go
 
-$ go tool compile unsafe.go
-$ go tool compile -I /usr/local/go unsafe.go
-$ go tool compile -I /usr/local/go/src/fmt unsafe.go
+    $ go tool compile unsafe.go
+    $ ls -l unsafe.o
+    -rw-r--r--  1 mtsouk  staff  6926 Jan 22 21:39 unsafe.o
+    $ file unsafe.o
+    unsafe.o: current ar archive
 
-page 71
+    $ go tool compile -pack unsafe.go
+    $ ls -l unsafe.a
+    -rw-r--r--  1 mtsouk  staff  6926 Jan 22 21:40 unsafe.a
+    $ file unsafe.a
+    unsafe.a: current ar archive
+
+    $ go tool compile -S unsafe.go
+
+----------------------------------------------------------
+Сборка мусора  (Garbage Collection, GC)  gColl.go
+
+    $ go run gColl.go
+    mem.Alloc: 124168
+    mem.TotalAlloc: 124168
+    mem.HeapAlloc: 124168
+    mem.NumGC: 0
+    -----
+    mem.Alloc: 50137432
+    mem.TotalAlloc: 500176208
+    mem.HeapAlloc: 50137432
+    mem.NumGC: 9
+    -----
+    mem.Alloc: 133568
+    mem.TotalAlloc: 1500257264
+    mem.HeapAlloc: 133568
+    mem.NumGC: 20
+    -----
+
+еще более по- дробный отчет о том, как работает сборщик мусора Go
+    $ GODEBUG=gctrace=1 go run gColl.go
+
+Трехцветный алгоритм
+Хеш-таблицы, срезы и сборщик мусора Go
+    sliceGC.go  Использование срезов
+    mapStar.go  Использование хеш-таблиц с указателями
+    mapNoStar.go  Использование хеш-таблиц без указателей
+    mapSplit.go  Разделение хеш-таблицы
+
+Сравнение производительности описанных методик
+    $ time go run sliceGC.go
+    go run sliceGC.go  0,50s user 0,47s system 98% cpu 0,982 total
+    $ time go run mapStar.go
+    go run mapStar.go  10,56s user 0,70s system 138% cpu 8,130 total
+    $ time go run mapNoStar.go
+    go run mapNoStar.go  5,14s user 0,31s system 97% cpu 5,582 total
+    $ time go run mapSplit.go
+    go run mapSplit.go  5,02s user 0,25s system 98% cpu 5,368 total
+
+
+----------------------------------------------------------
+Небезопасный код  Пакет unsafe  unsafe.go
+
+    $ go run unsafe.go
+    *p1:  5
+    *p2:  5
+    5434123412312431212
+    *p2:  -930866580
+    54341234
+    *p2:  54341234
+
+moreUnsafe.go получает доступ ко всем элементам массива с помощью указателей
+    $ go run moreUnsafe.go
+    0 1 -2 3 4 
+    One more: 1374390619880 
+
+стр. 86
+
+
+

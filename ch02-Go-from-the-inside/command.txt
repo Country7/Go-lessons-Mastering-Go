@@ -74,7 +74,141 @@ moreUnsafe.go получает доступ ко всем элементам м�
     0 1 -2 3 4 
     One more: 1374390619880 
 
-стр. 86
+
+----------------------------------------------------------
+Вызов C-кода из Go
+
+Вызов C-кода из Go в одном файле  cGo.go
+    $ go run cGo.go
+    A Go statement!
+    Calling C code!
+    Another Go statement!
+
+Вызов из Go C-кода в отдельных файлах
+C-код примера в двух файлах: callC.h и callC.c в отдельном каталоге callClib
+
+!!! нужно скомпилировать C-код, чтобы создать библиотеку
+    $ ls -l callClib/
+    total 16
+    -rwxr-xr-x  1 country  staff  162  4 июн 18:05 callC.c
+    -rwxr-xr-x  1 country  staff   89  4 июн 18:05 callC.h
+    $ gcc -c callClib/*.c
+    $ ls -l callC.o
+    -rw-r--r--  1 country  staff  912  4 июн 18:14 callC.o
+    $ file callC.o 
+    callC.o: Mach-O 64-bit object arm64
+    $ /usr/bin/ar rs callC.a *.o 
+    ar: creating archive callC.a
+    $ ls -l callC.a 
+    -rw-r--r--  1 country  staff  1120  4 июн 18:16 callC.a
+    $ file callC.a
+    callC.a: current ar archive random library
+    $ rm callC.o
+
+Теперь компилируем файл с Go-кодом
+    $ go build callC.go
+    $ ls -l callC
+    -rwxr-xr-x  1 country  staff  2077906  4 июн 18:21 callC
+    $ file callC
+    callC: Mach-O 64-bit executable arm64
+
+Запускаем исполняемый файл callC
+    $ ./callC
+    Going to call a C function!
+    Hello from C!
+    Going to call another C function!
+    Go send me This is Mihalis!
+    All perfectly done!
+
+----------------------------------------------------------
+Вызов Go-функций из C-кода  usedByC.go
+Go-пакет  
+Именем Go-пакета должно быть main, но имя файла может быть любым - ByC.go
+
+сгенерировать из Go-кода общую библиотеку C
+    $ go build -o usedByC.o -buildmode=c-shared usedByC.go
+    $ ls -l usedByC.*
+    -rwxr-xr-x  1 country  staff      204  4 июн 18:30 usedByC.go
+    -rw-r--r--  1 country  staff     1715  4 июн 18:33 usedByC.h
+    -rw-r--r--  1 country  staff  2060370  4 июн 18:33 usedByC.o
+    $ file usedByC.o
+    usedByC.o: Mach-O 64-bit dynamically linked shared library arm64
+
+компиляция C-кода, кот. содержится в исходном файле willUseGo.c
+    $ gcc -o willUseGo willUseGo.c ./usedByC.o
+    $ ./willUseGo
+    About to call a Go function!
+    A Go function!
+    Product: 276
+    It worked!
+
+
+----------------------------------------------------------
+Ключевое слово defer   defer.go
+    $ go run defer.go
+    1 2 3 
+    0 0 0 
+    1 2 3 
+
+Использование defer для журналирования   logDefer.go
+    $ go run logDefer.go
+    $ cat /tmp/mGo.log
+
+
+----------------------------------------------------------
+Функции panic() и recover()   panicRecover.go
+    $ go run panicRecover.go
+    Inside a()
+    About to call b()
+    Inside b()
+    Recover inside a()!
+    main() ended!
+
+Самостоятельное использование функции panic()   justPanic.go
+    $ go run justPanic.go
+
+
+----------------------------------------------------------
+Две полезные UNIX-утилиты   strace(1) и dtrace(1)
+    strace только для Linux
+    $ strace ls
+    $ strace find /usr 2>&1 | grep ioctl
+    $ strace -c find /usr 1>/dev/null
+
+    $ sudo dtruss godoc
+    $ sudo dtruss -c go run unsafe.go 2>&1
+
+
+----------------------------------------------------------
+Среда Go   goEnv.go   requiredVersion.go
+    $ go run goEnv.go
+    You are using gc on a arm64 machine
+    Using Go version go1.20.4
+    Number of CPUs: 10
+    Number of Goroutines: 1
+
+    $ go run requiredVersion.go
+    You are using Go version 1.8 or higher!
+
+Команда go env
+    $ go env
+
+
+----------------------------------------------------------
+Go-ассемблер
+    $ GOOS=darwin GOARCH=arm64 go tool compile -S goEnv.go
+аналог
+    $ GOOS=darwin GOARCH=arm64 go build -gcflags -S goEnv.go
+
+
+----------------------------------------------------------
+Узловые деревья
+
+стр. 106
+
+
+
+
 
 
 

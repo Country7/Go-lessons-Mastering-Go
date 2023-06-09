@@ -197,16 +197,53 @@ Go-пакет
 ----------------------------------------------------------
 Go-ассемблер
     $ GOOS=darwin GOARCH=arm64 go tool compile -S goEnv.go
-аналог
+рабочий аналог
     $ GOOS=darwin GOARCH=arm64 go build -gcflags -S goEnv.go
 
 
 ----------------------------------------------------------
 Узловые деревья
+    $ go tool compile -W nodeTree.go
+рабочий аналог
+    $ go build -gcflags -W nodeTree.go
+Параметр -W дает команде компиляции go tool инструкцию вывести на 
+экран дерево синтаксического анализа отладки (debug parse tree) после 
+проверки соответствия типов
 
-стр. 106
+    $ go tool compile -W defer.go | grep before
+    $ go tool compile -W nodeTreeMore.go | grep functionOne | uniq
+
+----------------------------------------------------------
+Хотите знать больше о go build?
+что происходит внутри компилятора go build, добавьте к ней флаг -x
+    $ go build -x defer.go
 
 
+----------------------------------------------------------
+Создание кода WebAssembly  (каталог wasm)
+    $ GOOS=js GOARCH=wasm go build -o main.wasm toWasm.go
+    $ ls -l
+    -rwxrwxrwx 1 vadim vadim 2090750 июн  9 12:01  main.wasm
+    -rwxrwxrwx 1 vadim vadim     100 июн  9 12:00  toWasm.go
+    $ file main.wasm
+    main.wasm: WebAssembly (wasm) binary module version 0x1 (MVP)
+значения GOOS и GOARCH дают инструкцию Go сгенерировать код WebAssembly. 
+Если не указать правильные значения GOOS и GOARCH, то при компиляции 
+не будет создан код WebAssembly или же возникнет сбой
+
+Включение флага в браузере Google Chrome улучшает время выполнения кода WebAssembly
+    chrome://flags/#enable-webassembly-baseline
+
+нужно скопировать main.wasm в каталог веб-сервера, а затем вы-
+полнить следующую команду:
+    $ cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" .
+
+запускаем index.html. Получаем ошибку доступа CORS:
+wasm/main.wasm' from origin 'null' has been blocked by CORS policy
+пробуем запустить через Node.js
+    $ export PATH="$PATH:$(go env GOROOT)/misc/wasm"
+    $ GOOS=js GOARCH=wasm go run toWasm.go
+    Creating WebAssembly code from Go!
 
 
 

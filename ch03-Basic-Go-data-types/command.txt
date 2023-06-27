@@ -363,7 +363,32 @@ time.Parse()
     Not a valid date time format!
     Not a match!
 
-стр. 159
+----------------------------------------------------------
+Измерение времени выполнения программы    execTime.go 
+
+time.Since()   один аргумент, который должен означать момент времени в прошлом
+    duration := time.Since(start)
+
+    $ go run execTime.go
+    It took time.Sleep(1) 1.000152671s to finish.
+    It took time.Sleep(2) 2.001153616s to finish.
+    It took the for loop 107.94656ms to finish.
+    It took the for loop 73.675711ms to finish.
+
+
+----------------------------------------------------------
+Измерение скорости работы сборщика мусора Go
+    sliceGCTime.go, mapNoStarTime.go, mapStarTime.go и mapSplitTime.go
+
+    $ go run sliceGCTime.go
+    It took GC() 11.92446ms to finish
+    $ go run mapNoStarTime.go
+    It took GC() 15.133376ms to finish
+    $ go run mapStarTime.go
+    It took GC() 995.945581ms to finish    // медленно сборщик мусора работает с хеш-таблицами
+    $ go run mapSplitTime.go
+    It took GC() 34.509111ms to finish
+
 
 
 

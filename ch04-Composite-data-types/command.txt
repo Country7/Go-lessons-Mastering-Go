@@ -62,14 +62,18 @@ sP := new([]aStructure)  // создается срез, указывающий 
 !!! Go не поддерживает тип кортежа
     но поддерживает определенные способы использования кортежей
 
+    func retThree(x int) (int, int, int) {
+        return 2 * x, x * x, -x
+    }
+    n1, n2, n3 := retThree(20)
+    n1, n2 = n2, n1
+    x1, x2, x3 := n1*2, n1*n1, -n1
+
     $ go run tuples.go
     20 100 -10
     40 400 -20
     400 40 -20
     800 160000 -400
-
-    n1, n2 = n2, n1
-    x1, x2, x3 := n1*2, n1*n1, -n1
 
 
 ----------------------------------------------------------
@@ -84,9 +88,51 @@ sP := new([]aStructure)  // создается срез, указывающий 
         fmt.Println((data[column-1]))
     }
 
-Более сложный пример
+Более сложный пример    changeDT.go   logEntries.txt
 
-стр. 176
+        r1 := regexp.MustCompile(`.*\[(\d\d\/\w+/\d\d\d\d:\d\d:\d\d:\d\d.*)\] .*`)
+        if r1.MatchString(line) {
+            match := r1.FindStringSubmatch(line)
+            d1, err := time.Parse("02/Jan/2006:15:04:05 -0700", match[1])
+            if err == nil {
+                newFormat := d1.Format(time.Stamp)
+                fmt.Print(strings.Replace(line, match[1], newFormat, 1))
+            } else {
+                notAMatch++
+            }
+            continue
+        }
+
+    regexp.MustCompile() похожа на функцию regexp.Compile(), 
+        но вызывает панику, если не может проанализировать выражение
+
+        r2 := regexp.MustCompile(`.*\[(\w+\-\d\d-\d\d:\d\d:\d\d:\d\d.*)\] .*`)
+        if r2.MatchString(line) {
+            match := r2.FindStringSubmatch(line)
+            d1, err := time.Parse("Jan-02-06:15:04:05 -0700", match[1])
+            if err == nil {
+                newFormat := d1.Format(time.Stamp)
+                fmt.Print(strings.Replace(line, match[1], newFormat, 1))
+            } else {
+                notAMatch++
+            }
+            continue
+        }
+
+        }
+        fmt.Println(notAMatch, "lines did not match!")
+    }
+
+Проверка IPv4-адресов    findIPv4.go
+
+    func findIP(input string) string {
+        partIP := "(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])"
+        grammar := partIP + "\\." + partIP + "\\." + partIP + "\\." + partIP
+        matchMe := regexp.MustCompile(grammar)
+        return matchMe.FindString(input)
+    }
+
+стр. 180
 
 
 

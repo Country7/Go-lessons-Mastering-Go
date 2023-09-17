@@ -132,12 +132,176 @@ sP := new([]aStructure)  // создается срез, указывающий 
         return matchMe.FindString(input)
     }
 
-стр. 180
+    $ go run findIPv4.go /tmp/auth.log.1 /tmp/auth.log | sort -rn | uniq -c | sort -rn
+        38 xxx.zz.116.9
+        33 x.zz.2.190
+        25 xx.zzz.1.41
+        20 178.132.1.18
+        18 x.zzz.63.53
+        17 178.zzz.y.9
+        15 103.yyy.xxx.179
+        10 213.z.yy.194
+        9 yy.xx.65.113
 
 
+----------------------------------------------------------
+----------------------------------------------------------
+Строки  (стр. 180)
+
+    ! Строки в Go являются переменными, хранящими значения, а не указателями, как строки в C
+      Строка Go — это байтовый срез, предназначенный только для чтения
+
+    const sLiteral = "\x99\x42\x32\x55\x50\x35\x23\x50\x29\x9c"
+    s2 := "€£3"
+
+    len() - длина строковой переменной   strings.go
+
+    go run strings.go
+        ?B2UP5#P)?
+        x: 9942325550352350299c
+        sLiteral length: 10
+        99 42 32 55 50 35 23 50 29 9c 
+        q: "\x99B2UP5#P)\x9c"
+        +q: "\x99B2UP5#P)\x9c"
+        x: 99 42 32 55 50 35 23 50 29 9c
+        s: As a string: ?B2UP5#P)?
+        U+20AC '€' starts at byte position 0
+        U+00A3 '£' starts at byte position 3
+        U+00B3 '³' starts at byte position 5
+        s2 length: 7
+        s3: ab12AB
+        x: 61 62 31 32 41 42
+        s3 length: 6
+        61 62 31 32 41 42
+
+----------------------------------------------------------
+Руны  (int32) - тип Go, который используется для представления кодовых пунктов Unicode
+    runes.go
+
+----------------------------------------------------------
+Пакет unicode    unicode.go
+
+    unicode.IsPrint() - какие части строки можно вывести с использованием рун
+    unicode.IsLetter()
+
+----------------------------------------------------------
+Пакет strings    useStrings.go
+
+    strings.ToUpper()
+    strings.ToLower()
+    strings.Title()
+    strings.EqualFold() - являются ли две строки одинаковыми, несмотря на различия в регистре букв
+    strings.HasPrefix() - true, если первая строка начинается со второй строки
+    strings.HasSuffix() - true, если первая строка заканчивается второй строкой
+    strings.Index()
+    strings.Count() - количество, когда второй параметр появляется в строке, заданной в первом параметре
+    strings.Repeat()
+    strings.TrimSpace()
+    strings.TrimLeft()
+    strings.TrimRight()
+    strings.TrimFunc()    
+    strings.Compare() - сравнивает две строки лексикографически; возвращает 0, если строки идентичны
+    strings.Fields() - разбивает строку на части, используя для разделения пробельные символы
+    strings.Split() - разбить заданную строку на части, ограниченные строкой-разделителем
+    strings.Replace() - Первый параметр — это строка, которую следует обработать. 
+                        Второй параметр содержит строку, которая, если будет найдена, 
+                        заменится на третий параметр функции. 
+                        Последний параметр — это максимальное количество замен, которые можно выполнить. 
+                        Если этот параметр меньше нуля, то количество возможных замен не ограничено
+    strings.Join()
+    strings.SplitAfter() - разбивает строку, переданную в качестве первого параметра, на подстроки 
+                            на основе строки-разделителя, заданной в качестве второго параметра
 
 
+----------------------------------------------------------
+----------------------------------------------------------
+Оператор switch    switch.go
 
+    ! в switch можно использовать регулярные выражения
+    ! последовательность вариантов в блоке switch имеет значение
+
+    switch asString {
+    case "1":
+        fmt.Println("One!")
+    case "0":
+        fmt.Println("Zero!")
+    default:
+        fmt.Println("Do not care!")
+    }
+
+    switch {
+    case number < 0:
+        fmt.Println("Less than zero!")
+    case number > 0:
+        fmt.Println("Bigger than zero!")
+    default:
+        fmt.Println("Zero!")
+    }
+
+    var negative = regexp.MustCompile(`-`)
+    var floatingPoint = regexp.MustCompile(`\d?\.\d`)
+    var email = regexp.MustCompile(`^[^@]+@[^@.]+\.[^@.]+`)
+    switch {
+    case negative.MatchString(asString):
+        fmt.Println("Negative number")
+    case floatingPoint.MatchString(asString):
+        fmt.Println("Floating point!")
+    case email.MatchString(asString):
+        fmt.Println("It is an email!")
+        fallthrough  // - выполняет ветвь, которая следует за текущей
+    default:
+        fmt.Println("Something else!")
+    }
+
+    var aType error = nil
+    switch aType.(type) {
+    case nil:
+        fmt.Println("It is nil interface!")
+    default:
+        fmt.Println("Not nil interface!")
+    }
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Вычисление числа π с высокой точностью
+
+    Программа вычисления числа π по формуле Белларда    calculatePi.go
+    пакеты "math", "math/big"
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Разработка на Go хранилища типа «ключ — значение»    keyValue.go
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Go и формат JSON
+
+    пакет encoding/json
+
+Чтение данных из формата JSON    readJSON.go
+
+    json.NewDecoder(), чтобы создать новый декодер JSON, связанный с файлом
+    Decode(), чтобы декодировать содержимое файла и поместить его в нужную структуру данных
+
+    decodeJSON := json.NewDecoder(in)
+    err = decodeJSON.Decode(key)
+
+Сохранение данных в формате JSON    writeJSON.go
+
+    encodeJSON := json.NewEncoder(filename) - переменная связана с именем файла, в который будут помещаться данные
+    err := encodeJSON.Encode(key) - кодирует данные и сохраняет их в нужный файл
+
+Использование функций Marshal() и Unmarshal()    mUJSON.go
+
+    rec, err := json.Marshal(&myRecord) - принимает ссылку на переменную, которая преобразуется в формат JSON
+
+    err1 := json.Unmarshal(rec, &unRec) - получает входные данные JSON и преобразует их в структуру Go
+
+
+стр. 205
 
 
 

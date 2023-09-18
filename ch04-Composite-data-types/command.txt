@@ -300,8 +300,57 @@ Go и формат JSON
 
     err1 := json.Unmarshal(rec, &unRec) - получает входные данные JSON и преобразует их в структуру Go
 
+----------------------------------------------------------
+Синтаксический анализ данных в формате JSON    parsingJSON.go
 
-стр. 205
+    ! неструктурированные данные JSON помещаются
+      не в структуры, а в хеш-таблицы Go
 
+    fileData, err := ioutil.ReadFile(filename)  - позволяет прочитать сразу весь файл
+    var parsedData map[string]interface{}  - определена хеш-таблица
+    json.Unmarshal([]byte(fileData), &parsedData) - поместить содержимое файла в хеш-таблицу parsedData
+    for key, value := range parsedData {
+        fmt.Println("key:", key, "value:", value)
+    }
+
+    $ go run parsingJSON.go noStr.json
+        key: Tel value: [map[Mobile:true Number:1234-567] map[Mobile:true
+        Number:1234-abcd] map[Mobile:false Number:abcc-567]]
+        key: Name value: John
+        key: Surname value: Doe
+        key: Age value: 25
+        key: Parents value: [Jim Mary]
+    Обратите внимание: как видно из результатов работы программы, ключи хеш-
+    таблицы выводятся в случайном порядке
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Go и XML    rwXML.go
+
+    xmlData, _ := xml.MarshalIndent(myRecord, "", "     ")  - данные преобразованы в формат XML
+    xmlData = []byte(xml.Header + string(xmlData)) - добавлен заголовок
+    fmt.Println("\nxmlData:", string(xmlData))
+
+    $ go run rwXML.go readMe.json
+
+Чтение XML-файла    readXML.go
+
+    decodeXML := xml.NewDecoder(in)
+    err = decodeXML.Decode(key)
+    ...
+    var myRecord Record
+    err := loadFromXML(filename, &myRecord)
+
+    $ go run readXML.go data.xml
+
+Настройка вывода данных в формате XML    modXML.go
+    $ go run modXML.go
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Go и формат YAML
+    Формат YAML поддерживается пакетом Viper
 
 

@@ -1,11 +1,122 @@
 Неочевидные знания о пакетах и функциях Go
 
 ----------------------------------------------------------
-Что такое Go-пакеты   
+Что такое Go-пакеты    aPackage.go
 
     Go-пакет — это файл с исходным кодом Go, который начинается 
     с ключевого слова package, после него стоит имя пакета
 
-стр. 274
+    $ go run aPackage.go
+    go run: cannot run non-main package
+
+----------------------------------------------------------
+Что такое функции Go
+
+Анонимные функции  (замыкания)    functions.go
+
+    square := func(s int) int {
+        return s * s
+    }
+    fmt.Println("The square of", y, "is", square(y))
+
+Функции, которые возвращают несколько значений   functions.go
+
+    func aFunction() (int, int, float64, string) {
+    }
+
+Функции, возвращающие именованные значения   returnNames.go
+
+    func namedMinMax(x, y int) (min, max int) {
+        if x > y {
+            min = y
+            max = x
+        } else {
+            min = x
+            max = y
+        }
+        return
+    }
+
+Функции, принимающие указатели   ptrFun.go
+
+    func getPtr(v *float64) float64 {
+        return *v * *v
+    }
+        x := 12.2
+        fmt.Println(getPtr(&x))
+
+Функции, которые возвращают указатели   returnPtr.go
+
+    func returnPtr(x int) *int {
+        y := x * x
+        return &y
+    }
+        sq := returnPtr(10)
+        fmt.Println("sq value:", *sq)
+        fmt.Println("sq memory address:", sq)
+
+Функции, которые возвращают другие функции   returnFunction.go
+
+    func funReturnFun() func() int {
+        i := 0
+        return func() int {
+            i++
+            return i * i
+        }
+    }
+        i := funReturnFun()
+        j := funReturnFun()
+    i и j - разные функции
+
+Функции, которые принимают другие функции в качестве параметров   funFun.go
+
+    func funFun(f func(int) int, v int) int {
+        return f(v)
+    }
+        funFun(function1, 123)
+        funFun(func(i int) int {return i * i * i}, 123)
+
+Функции с переменным числом параметров    variadic.go
+
+    func varFunc(input ...string) {
+        fmt.Println(input)
+    }
+
+    оператор ...Type, называется оператором упаковки
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Разработка Go-пакетов    aPackage.go  useAPackage.go
+
+    Может потребоваться удаление и установка Go
+    Удалить старую версию Go:
+    $ sudo apt-get remove golang-go
+    $ sudo apt-get remove --auto-remove golang-go
+    проверяем:
+    $ which go
+    Скачиваем последнюю версию: https://go.dev/dl/
+    Распаковываем:
+    $ sudo tar -C /usr/local -xvzf /home/country/Загрузки/go1.21.4.linux-amd64.tar.gz
+    Настраиваем рабочее пространство Go:
+    $ mkdir -p ~/go/{bin,src,pkg}
+    в файле /etc/profile добавляем строки:
+    export GOROOT=/usr/local/go
+    export PATH=$PATH:$GOROOT/bin
+    в файле /home/country/.profile добавляем строки:
+    export GOPATH="$HOME/go"
+    export GOBIN="$GOPATH/bin"
+    export GOROOT=/usr/local/go
+    export PATH=$PATH:$GOROOT/bin
+    вносим изменения в профиль пользователя:
+    $ source /home/country/.profile
+    проверяем:
+    $ go version
+    $ go env
+
+
+
+
+стр. 286
 
 

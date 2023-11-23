@@ -114,9 +114,95 @@
     $ go version
     $ go env
 
+    Если запустим программу просто так, то получим ошибку:
+    $ go run useAPackage.go
+    useAPackage.go:4:2: package aPackage is not in std (/usr/local/go/src/aPackage)
+
+    Чтобы установить разработанный пакет, необходимо 
+    выполнить следующие команды:
+
+    По книге вот так, но реально не работает:
+    $ mkdir ~/go/src/aPackage
+    $ cp aPackage.go ~/go/src/aPackage/
+    $ go install aPackage
+    $ cd ~/go/pkg/darwin_amd64/
+    $ ls -l aPackage.a
+    -rw-r--r-- 1 mtsouk staff 4980 Dec 22 06:12 aPackage.a
+
+    $ go run useAPackage.go
+    Using aPackage!
+    This is function A!
+    privateConstant: 21
+    123
+
+Компиляция Go-пакета
+
+    $ go tool compile aPackage.go
+    $ ls -l aPackage.*
+    -rw-r--r--@ 1 mtsouk staff 201 Jan 10 22:08 aPackage.go
+    -rw-r--r-- 1 mtsouk staff 16316 Mar 4 20:01 aPackage.o
+
+
+----------------------------------------------------------
+Закрытые переменные и функции
+
+    функции, переменные, типы и т. д., имена которых 
+    начинаются с заглавной буквы, являются открытыми.
+    А функции, переменные, типы и т. д., имена которых 
+    начинаются со строчной буквы, являются закрытыми.
+
+----------------------------------------------------------
+Функция init()
+    автоматически выполняется в начале выполнения пакета
+
+
+----------------------------------------------------------
+Go-модули
+Создание и использование Go-модулей
+Создание версии v1.0.0
+
+    $ go mod init
+    $ touch myModule.go
+    $ vi myModule.go
+    $ git add .
+    $ git commit -a -m "Initial version 1.0.0"
+    $ git push
+    $ git tag v1.0.0
+    $ git push -q origin v1.0.0
+    $ go list
+    github.com/mactsouk/myModule
+    $ go list -m
+    github.com/mactsouk/myModule
+
+    $ cat go.mod
+
+Использование версии v1.0.0
+
+    $ export GO111MODULE=on
+    $ go run useModule.go
+    $ go mod init hello
+    $ go build
+
+Создание версии v1.1.0
+
+    $ vi myModule.go
+    $ git commit -a -m "v1.1.0"
+    $ git push
+    $ git tag v1.1.0
+    $ git push -q origin v1.1.0
+
+Использование версии v1.1.0
+
+    $ docker run --rm -it golang:latest
+    ...
 
 
 
-стр. 286
+
+
+
+
+
+стр. 300
 
 

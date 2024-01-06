@@ -196,13 +196,134 @@ Go-модули
     $ docker run --rm -it golang:latest
     ...
 
+Использование двух версий одного и того же Go-модуля
+    package main
+    import (
+        v1 "github.com/mactsouk/myModule"
+        v2 "github.com/mactsouk/myModule/v2"
+    )
+    func main() {
+        v1.Version()
+        v2.Version()
+    }
+
+    $ export GO111MODULE=on
+    $ go run useTwo.go
+
+Где хранятся Go-модули
+    MacOS Mojave содержимое каталога ~/go/pkg/mod/github.com/mactsouk
+
+Команда go mod vendor
+    хранить все зависимости в одном месте, рядом с файлами проекта
+
+    $ cd useTwoVersions
+    $ go mod init useV1V2
+        go: creating new go.mod: module useV1V2
+    $ go mod vendor
+    $ ls -l
+    $ ls -l vendor/github.com/mactsouk/myModule
+    $ ls -l vendor/github.com/mactsouk/myModule/v2
+
+    Главное здесь — выполнение команды go mod init <имя пакета> перед командой go mod vendor
+
+Как писать хорошие Go-пакеты
+    ...
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пакет syscall   useSyscall.go
+
+    pid, _, _ := syscall.Syscall(39, 0, 0, 0)
+    fmt.Println("My pid is", pid)
+    uid, _, _ := syscall.Syscall(24, 0, 0, 0)
+    fmt.Println("User ID:", uid)
+
+    message := []byte{'H', 'e', 'l', 'l', 'o', '!', '\n'}
+    fd := 1
+    syscall.Write(fd, message)
+
+    command := "/bin/ls"
+    env := os.Environ()
+    syscall.Exec(command, []string{"ls", "-a", "-x"}, env)
+
+Как на самом деле работает fmt.Println()
+    ...
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пакеты go/scanner, go/parser и go/token
+
+    Синтаксический анализ языка выполняется в два этапа. Первый из них заклю-
+    чается в разбиении входных данных на лексемы (лексический анализ), а второй —
+    в передаче этих лексем синтаксическому анализатору, чтобы убедиться, что эти
+    лексемы имеют смысл и находятся в правильном порядке (семантический анализ),
+    ведь, если произвольно сочетать английские слова, не всегда получится правильное
+    предложение.
+
+
+Пакет go/ast
+    Абстрактное синтаксическое дерево (Abstract Syntax Tree, AST) — структури-
+    рованное представление исходного кода программы Go
+
+Пакет go/scanner    goScanner.go
+    Сканер — это то, что читает программу, написанную на языке программирования,
+    и генерирует лексемы. В данном случае это код Go, который читает программу,
+    созданную на языке Go
+
+    $ go build goScanner.go 
+    $ ./goScanner a.go 
+
+Пакет go/parser   goParser.go
+    Синтаксический анализатор получает результаты работы сканера (лексемы)
+    и синтезирует из них структуру. Используя грамматику, которая описывает язык
+    программирования, синтаксический анализатор проверяет, образуют ли получен-
+    ные лексемы допустимую программу.
+
+    $ go build goParser.go
+    $ ./goParser a.go
+
+Практический пример    varTimes.go
+    $ go build varTimes.go
+    $ ./varTimes varTimes.go variadic.go a.go
+
+Поиск имен переменных заданной длины   varSize.go
+    $ go build varSize.go
+    $ ./varSize
+        Not enough arguments!
+    $ ./varSize 2 varSize.go variadic.go
+    $ ./varSize 3 varSize.go variadic.go
+    $ ./varSize 7 varSize.go variadic.go
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Шаблоны для текста и HTML     text/template и html/template
+    Если импортировать одновременно и text/template, и html/template, то 
+    следует присвоить одному из них псевдоним
+
+Вывод простого текста   textT.go   text.gotext
+    $ go run textT.go text.gotext
+
+    Ключевое слово range позволяет перебрать строки
+    переменные и динамический текст должны заключаться в двойные фигурные скобки: {{ … }}
+    Поля структуры доступны под именами .Number и .Square
+    Выполнение команды {{ range }} заканчивается командой {{ end }}
+    пустые строки в файлах текстовых шаблонов имеют большое значение и будут
+    отражаться при итоговом выводе
+
+Вывод текста в формате HTML   htmlT.go   html.gohtml
+
+    $ go mod init useV1V2
+    $ go get github.com/mattn/go-sqlite3
+    $ go run htmlT.go htmlT.db html.gohtml
+    в браузере localhost:8080
 
 
 
 
 
 
-
-стр. 300
+стр. 330
 
 

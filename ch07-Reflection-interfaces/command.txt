@@ -104,12 +104,75 @@
 
 
 ----------------------------------------------------------
-Использование переключателей для интерфейсов и типов данных
+Использование переключателей для интерфейсов и типов данных    switch.go
+
+    type rectangle struct {
+        X float64
+        Y float64
+    }
+    func tellInterface(x interface{}) {
+        switch v := x.(type) {
+        case square:
+            fmt.Println("This is a square!")
+        case circle:
+            fmt.Printf("%v is a circle!\n", v)
+        case rectangle:
+            fmt.Println("This is a rectangle!")
+        default:
+            fmt.Printf("Unknown type %T!\n", v)
+        }
+    }
+        y := rectangle{X: 4, Y: 1}
+	    tellInterface(y)
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Рефлексия
+
+    Рефлексия — это дополнительная функциональность Go, которая позволяет дина-
+    мически, в процессе выполнения программы, узнавать тип произвольного объекта,
+    а также получать информацию о его структуре. Для работы с рефлексией в Go
+    создан пакет reflect
+
+----------------------------------------------------------
+Простой пример рефлексии   reflection.go
+
+    x := 100
+	xRefl := reflect.ValueOf(&x).Elem()
+	xType := xRefl.Type()
+    =
+    xType := reflect.TypeOf(x)
+
+    var r reflect.Value
+    r = reflect.ValueOf(&A).Elem()
+        Типом переменной r должен быть reflect.Value, по-
+        скольку функция reflect.ValueOf() возвращает значение именно этого типа. Метод
+        Elem() возвращает значение, содержащееся в интерфейсе рефлексии (reflect.Value)
+
+    iType := r.Type()
+    for i := 0; i < r.NumField(); i++ {
+        fmt.Printf("Field name: %s ", iType.Field(i).Name)
+        fmt.Printf("with type: %s ", r.Field(i).Type())
+        fmt.Printf("and value %v\n", r.Field(i).Interface())
+    }
+    функции пакета reflect: 
+    Метод NumField() возвращает количество полей в структуре reflect.Value, а 
+    функция Field() возвращает поле структуры, переданной ей в качестве параметра. 
+    Функция Interface() возвращает значение поля структуры reflect.Value в качестве интерфейса
+
+    $ go run reflection.go 1
+    $ go run reflection.go
+
+----------------------------------------------------------
+Более сложный пример рефлексии    advRefl.go
+
+    type t1 int
+    type t2 int
+        для Go t1 и t2 - это разные типы
+        Их внутреннее представление будет main.t1 и main.t2 соответственно
 
 
 
 
-
-
-
-стр. 338
+стр. 343

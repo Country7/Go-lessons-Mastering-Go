@@ -1,0 +1,115 @@
+Рефлексия и интерфейсы на все случаи жизни
+
+----------------------------------------------------------
+Методы типов    method.go
+
+    Метод типа (type method) в Go — это функция со специальным аргументом-при-
+    емником. Такой метод объявляется как обычная функция с дополнительным
+    параметром, который ставится перед именем функции. Данный параметр связы-
+    вает функцию с типом этого дополнительного параметра. Именно этот параметр
+    называется приемником метода.
+
+    func (f *File) Close() error {
+        if err := f.checkValid("close"); err != nil {
+            return err
+        }
+        return f.file.close()
+    }
+
+    type twoInts struct {X int64 Y int64}
+    func regularFunction(a, b twoInts) twoInts {
+        temp := twoInts{X: a.X + b.X, Y: a.Y + b.Y}
+        return temp
+    }
+    func (a twoInts) method(b twoInts) twoInts {
+        temp := twoInts{X: a.X + b.X, Y: a.Y + b.Y}
+        return temp
+    }
+        i := twoInts{X: 1, Y: 2}
+        j := twoInts{X: -5, Y: -2}
+        fmt.Println(regularFunction(i, j))
+        fmt.Println(i.method(j))
+
+
+----------------------------------------------------------
+Интерфейсы в Go
+
+    Интерфейсный тип в Go определяет поведение других типов путем предоставле-
+    ния списка методов, которые необходимо реализовать. Чтобы тип соответствовал
+    интерфейсу, в нем необходимо реализовать все методы, предусмотренные этим
+    интерфейсом
+
+    Проще говоря, интерфейс — это абстрактный тип, определяющий множе-
+    ство функций, которые необходимо реализовать для типа, чтобы его можно
+    было считать экземпляром интерфейса. Если это сделано, можно сказать, что
+    тип удовлетворяет данному интерфейсу. Таким образом, интерфейс — это две
+    составляющие: набор методов и тип. Интерфейс используется для определения
+    поведения других типов.
+
+    io.Reader и io.Writer
+    type Reader interface {
+        Read(p []byte) (n int, err error)
+    }
+    type Writer interface {
+        Write(p []byte) (n int, err error)
+    }
+
+----------------------------------------------------------
+Операции утверждения типа    assertion.go   myInterface.go   useInterface.go
+
+    Операции утверждения типа — это записи вида x.(T), где x — интерфейсный тип, а T — тип
+
+    var myInt interface{} = 123
+    k, ok := myInt.(int)
+    if ok {
+        fmt.Println("Success:", k)
+    }
+
+    $ mkdir ~/go/src/myInterface
+    $ cp myInterface.go ~/go/src/myInterface
+    $ go install myInterface
+
+----------------------------------------------------------
+Использование интерфейса Go    useInterface.go
+
+    func (s circle) Area() float64 {
+        return s.R * s.R * math.Pi
+    }
+    func (s circle) Perimeter() float64 {
+        return 2 * s.R * math.Pi
+    }
+    func Calculate(x myInterface.Shape) {
+        _, ok := x.(circle)
+        if ok {
+            fmt.Println("Is a circle!")
+        }
+        v, ok := x.(square)
+        if ok {
+            fmt.Println("Is a square:", v)
+        }
+        fmt.Println(x.Area())
+        fmt.Println(x.Perimeter())
+    }
+
+    Как видим, в этом коде реализована функция, для которой требуется один пара-
+    метр типа shape, — myInterface.Shape. Эта магия станет более очевидной, когда вы
+    поймете, что здесь подойдет любой параметр типа shape, то есть любой параметр,
+    тип которого реализует интерфейс shape
+
+    x := square{X: 10}
+    fmt.Println("Perimeter:", x.Perimeter())
+    Calculate(x)
+    y := circle{R: 5}
+    Calculate(y)
+
+
+----------------------------------------------------------
+Использование переключателей для интерфейсов и типов данных
+
+
+
+
+
+
+
+стр. 338

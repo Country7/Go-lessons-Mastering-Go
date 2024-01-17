@@ -1,0 +1,241 @@
+Как объяснить UNIX-системе, что она должна делать
+
+----------------------------------------------------------
+О процессах в UNIX
+
+    Процесс, Программа
+    идентификатором процесса
+    пользовательские процессы, процессы-демоны и процессы ядра
+
+    В C - стиль создания новых процессов заключается в системном вызове
+    функции fork(). Значение, возвращаемое fork(), позволяет програм-
+    мисту различать родительский и дочерний процессы. В Go, наоборот,
+    такая функциональность не поддерживается, вместо нее используются
+    горутины.
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пакет flag     
+
+    Для утилит командной строки UNIX, пакет flag будет очень интересен и полезен
+
+простая программа    simpleFlag.go
+
+	minusK := flag.Bool("k", true, "k flag")
+	minusO := flag.Int("O", 1, "O")
+	flag.Parse()
+
+	valueK := *minusK
+	valueO := *minusO
+	valueO++
+	fmt.Println("-k:", valueK)
+	fmt.Println("-O:", valueO)
+
+    $ go run simpleFlag.go -O=100 -k=false
+        -k: false
+        -O: 101
+
+расширенная программа    funWithFlag.go
+
+    Функция flag.Var() создает флаг любого типа, который соответствует интерфейсу flag.Value
+    type Value interface {
+        String() string
+        Set(string) error
+    }
+
+    Прежде всего здесь метод Set() гарантирует, что соответствующему аргументу
+    командной строки еще не присвоено значение. Затем этот метод получает входные
+    данные и разделяет их на отдельные аргументы с помощью функции strings.Split().
+    После этого аргументы сохраняются в поле Names структуры NamesFlag
+
+    Срез flag.Args() содержит оставшиеся аргументы командной строки, а пере-
+    менная manyNames — значения аргументов командной строки из flag.Var()
+
+    $ go run funWithFlag.go -names=Mihalis,Jim,Athina 1 two Three
+        -k: 0
+        -o: Mihalis
+        0 Mihalis
+        1 Jim
+        2 Athina
+        Remaining command line arguments:
+        0 : 1
+        1 : two
+        2 : Three
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пакет viper
+
+    Обратите внимание, что пакет viper способен полностью заменить пакет flag.
+    Пакет flag не предоставляет такой функциональности — это позволяет делать 
+    стандартный Go-пакет os, однако не так просто, как viper.
+
+Простой пример использования viper     /viper/useViper.go
+
+    $ go mod myviper
+    $ go get -u github.com/spf13/viper
+        GOMAXPROCS: <nil>
+        GOMAXPROCS: 10
+        NEW_VARIABLE not defined.
+
+От flag к viper     /viper/flagToViper.go
+
+    flag.Int("i", 100, "i parameter")
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+	viper.BindPFlags(pflag.CommandLine)
+	i := viper.GetInt("i")
+	fmt.Println(i)
+
+    $ go get -u github.com/spf13/pflag
+    $ go run flagToViper.go
+    $ go build flagToViper.go
+    $ ./flagToViper -i 0
+    $ ./flagToViper -i abcd
+    $ ./flagToViper -j 200
+
+
+Чтение конфигурационных файлов в формате JSON   /viper/readJSON.go   myJSONConfig.json
+
+    viper.SetConfigType("json")
+	viper.SetConfigFile("./myJSONConfig.json")
+	fmt.Printf("Using config: %s\n", viper.ConfigFileUsed())
+	viper.ReadInConfig()
+	if viper.IsSet("item1.key1") {
+		fmt.Println("item1.key1:", viper.Get("item1.key1"))
+	} else {
+		fmt.Println("item1.key1 not set!")
+	}
+
+    $ go run readJSON.go
+
+Чтение конфигурационных файлов в формате YAML   /viper/readYAML.go   myConfig.yaml
+
+    var configFile *string = pflag.String("c", "myConfig", "Setting the configuration file")
+	pflag.Parse()
+	_, err := os.Stat(*configFile)
+	if err == nil {
+		fmt.Println("Using User Specified Configuration file!")
+		viper.SetConfigFile(*configFile)
+	} else {
+		viper.SetConfigName(*configFile)
+		viper.AddConfigPath("$HOME")
+		viper.AddConfigPath(".")
+	}
+    Этот код проверяет, существует ли файл, указанный в значении флага 
+    конфигурации (--c), используя вызов os.Stat()
+    иначе предлагаемое по умолчанию (myConfig)
+
+    мы не указываем точно, что хотим использовать конфигурационный файл в формате
+    YAML, — программа будет искать все поддерживаемые форматы файлов при условии, 
+    что имя файла без расширения — myConfig. Именно так работает viper
+	
+    err = viper.ReadInConfig()
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		return
+	}
+	fmt.Printf("Using config: %s\n", viper.ConfigFileUsed())
+    Использование viper.ConfigFileUsed() совершенно оправданно, поскольку
+    конфигурационный файл не задан жестко, следовательно, нам придется определять
+    его самостоятельно
+
+    Чтение и синтаксический анализ YAML-файла выполняются с помощью вызова
+    функции viper.ReadInConfig()
+
+	if viper.IsSet("item1.k1") {
+		fmt.Println("item1.val1:", viper.Get("item1.k1"))
+	} else {
+		fmt.Println("item1.k1 not set!")
+	}
+	if !viper.IsSet("item3.k1") {
+		fmt.Println("item3.k1 is not set!")
+	}
+
+    $ go build readYAML.go
+    $ ./readYAML
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пакет cobra
+
+    Пакет cobra — очень удобный и популярный Go-пакет, позволяет разрабаты-
+    вать утилиты командной строки, имеющие команды, подкоманды и псевдонимы.
+
+Простой пример cobra
+
+    $ go get -u github.com/spf13/cobra@latest
+    $ go install github.com/spf13/cobra-cli@latest
+    $ $GOBIN/cobra-cli
+
+создадим новый проект cobra:    cli
+
+    $ go mod init cli
+    $ $GOBIN/cobra-cli init cli
+
+    $ cd ./cli
+    $ $GOBIN/cobra-cli add cmdOne 
+    $ $GOBIN/cobra-cli add cmdTwo
+
+    $ go run main.go  (на заработало пока не скопировал сli/cmd в $GOROOT/src/)
+
+    cli/cmd/cmdOne.go
+    В следующей строке кода из функции init() определяется новый флаг командной строки:
+        cmdOneCmd.Flags().Int("number", 0, "A help for number")
+    Этот флаг называется number и используется в блоке cobra.Command следующим образом:
+        number, _ := cmd.Flags().GetInt("number")
+    Теперь мы можем использовать переменную number любым удобным способом
+
+    $ go run main.go cmdOne
+    $ go run main.go cmdOne --number -20
+    $ go run main.go cmdTwo
+    $ go run main.go cmdThree
+    $ go run main.go cmdOne --help
+
+Создание псевдонимов команд:    aliases
+
+    в ./go.mod название модуля поменял на aliases
+
+    $ $GOBIN/cobra-cli init aliases (если $GOBIN добавить в PATH, тогда не нужно постоянно его дописывать) =
+    $ cobra-cli init aliases
+    $ cd ./aliases
+    $ cobra-cli add initialization
+    $ cobra-cli add preferences
+
+    Aliases: []string{"initialize", "init"},
+    Aliases: []string{"prefer", "pref", "prf"},
+
+    скопировал aliases/cmd в $GOROOT/src/
+
+    $ go run main.go prefer
+    $ go run main.go prf
+    $ go run main.go init
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Интерфейсы io.Reader и io.Writer
+
+----------------------------------------------------------
+Буферизованный и небуферизованный ввод и вывод в файл
+
+----------------------------------------------------------
+Пакет bufio
+    bufio.Reader и bufio.Writer
+
+----------------------------------------------------------
+Чтение текстовых файлов
+
+Построчное чтение текстового файла   byLine.go
+
+
+
+
+
+
+
+
+
+Стр. 386

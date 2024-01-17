@@ -230,12 +230,383 @@
 
 Построчное чтение текстового файла   byLine.go
 
+    f, err := os.Open(file)
+    defer f.Close()
+    r := bufio.NewReader(f)
+    for {
+        line, err := r.ReadString('\n')
+        if err == io.EOF {
+            break
+        } else if err != nil {
+            fmt.Printf("error reading file %s", err)
+            break
+        }
+        fmt.Print(line)
+    }
+
+    $ go run byLine.go command.txt | wc
+
+Чтение текстового файла по словам    byWord.go
+
+    line, err := r.ReadString('\n')
+    r := regexp.MustCompile("[^\\s]+")
+    words := r.FindAllString(line, -1)
+    for i := 0; i < len(words); i++ {
+        fmt.Println(words[i])
+    }
+
+    $ go run byWord.go command.txt | wc
+
+Посимвольное чтение текстового файла    byCharacter.go
+
+    line, err := r.ReadString('\n')
+    for _, x := range line {
+        fmt.Print(string(x) + " ")
+    }
+
+    $ go run byCharacter.go command.txt
+
+----------------------------------------------------------
+Чтение из /dev/random    devRandom.go
+
+    Нужно импортировать стандартный Go-пакет encoding/binary, поскольку 
+    /dev/random предоставляет двоичные данные, которые необходимо декодировать
+
+    f, err := os.Open("/dev/random")
+    defer f.Close()
+	var seed int64
+	binary.Read(f, binary.LittleEndian, &seed)
+	fmt.Println("Seed:", seed)
+
+    $ go run devRandom.go
+
+----------------------------------------------------------
+Чтение заданного количества данных    readSize.go
+
+    мы создаем байтовый срез нужного размера и используем его для чтения данных
+
+    func readSize(f *os.File, size int) []byte {
+        buffer := make([]byte, size)
+        n, err := f.Read(buffer)
+        if err == io.EOF {
+            return nil
+        }
+        if err != nil {
+            fmt.Println(err)
+            return nil
+        }
+        return buffer[0:n]
+    }
+
+    $ go run readSize.go 1000 command.txt | wc
+    $ wc command.txt
+
+
+----------------------------------------------------------
+Чтение CSV-файлов    CSVplot.go   dataFile
+
+    CSV-файлы — это простые форматированные текстовые файлы
+
+    воспользуемся внешней библиотекой Glot, — она поможет нам построить график 
+    по точкам, координаты которых будут прочитаны из CSV-файла. 
+    Обратите внимание, что в Glot используется Gnuplot,
+    поэтому, чтобы использовать Glot, придется установить библиотеку Gnuplot
+
+    file := os.Args[1]
+    _, err := os.Stat(file)  // существует файл или нет
+
+    f, err := os.Open(file)
+	defer f.Close()
+
+	reader := csv.NewReader(f)
+	reader.FieldsPerRecord = -1
+	allRecords, err := reader.ReadAll()
+
+	xP := []float64{}
+	yP := []float64{}
+	for _, rec := range allRecords {
+		x, _ := strconv.ParseFloat(rec[0], 64)
+		y, _ := strconv.ParseFloat(rec[1], 64)
+		xP = append(xP, x)
+		yP = append(yP, y)
+	}
+
+	points := [][]float64{}
+	points = append(points, xP)
+	points = append(points, yP)
+	fmt.Println(points)
+
+    $ go mod init csvplot
+    $ go get github.com/Arafatk/glot
+
+    $ go run CSVplot.go doesNoExist 
+    $ go run CSVplot.go dataFile
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Запись в файл    save.go
+
+	s := []byte("Data to write\n")
+
+	f1, err := os.Create("f1.txt")
+	defer f1.Close()
+	fmt.Fprintf(f1, string(s))
+
+	f2, err := os.Create("f2.txt")
+	defer f2.Close()
+	n, err := f2.WriteString(string(s))
+	fmt.Printf("wrote %d bytes\n", n)
+
+	f3, err := os.Create("f3.txt")
+	w := bufio.NewWriter(f3)
+	n, err = w.WriteString(string(s))
+	fmt.Printf("wrote %d bytes\n", n)
+	w.Flush()
+
+	f4 := "f4.txt"
+	err = ioutil.WriteFile(f4, s, 0644)
+
+	f5, err := os.Create("f5.txt")
+	n, err = io.WriteString(f5, string(s))
+	fmt.Printf("wrote %d bytes\n", n)
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Загрузка и сохранение данных на диске    kvSaveLoad.go
+
+    преобразования данных в поток байтов называется сериализацией
+    Процесс чтения файла данных и преобразования в объект называется десериализацией
+    Для сериализации и десериализации используется стандартный Go-пакет encoding/gob
+    Пакет encoding/gob сохраняет данные в формате gob
+    Официально такие форматы называются потоковым кодированием.
+
+    В Go для сериализации и десериализации данных также используются такие
+    пакеты, как encoding/xml, который преобразует данные в формат XML, и encoding/
+    json, который сохраняет данные в формате JSON
+
+    $ diff keyValue.go kvSaveLoad.go  // сравнение с keyValue.go из главы 4
+
+    type myElement struct {
+        Name    string
+        Surname string
+        Id      string
+    }
+    var DATA = make(map[string]myElement)
+    var DATAFILE = "/tmp/dataFile.gob"
+
+    func save() error {
+        err := os.Remove(DATAFILE)
+        saveTo, err := os.Create(DATAFILE)
+        defer saveTo.Close()
+        encoder := gob.NewEncoder(saveTo)
+        err = encoder.Encode(DATA)
+        return nil
+    }
+
+    func load() error {
+        loadFrom, err := os.Open(DATAFILE)
+        defer loadFrom.Close()
+        decoder := gob.NewDecoder(loadFrom)
+        decoder.Decode(&DATA)
+        return nil
+    }
+
+    $ go run kvSaveLoad.go
+
+----------------------------------------------------------
+И снова пакет strings
+
+    функции пакета strings, связанные с вводом и выводом данных в файл
+
+    Объект strings.Reader реализует интерфейсыio.Reader, io.ReaderAt, 
+    io.Seeker, io.WriterTo, io.ByteScanner и io.RuneScanner
+
+    можно использовать strings.Reader в качестве io.Reader
+    для побайтного чтения строки с помощью функции Read()
+
+    $ go run str.go
+
+----------------------------------------------------------
+Пакет bytes    bytes.go
+
+    пакет bytes содержит функции для работы с байтовыми срезами
+
+    $ go run bytes.go
+
+----------------------------------------------------------
+Полномочия доступа к файлам    permissions.go
+
+	arguments := os.Args
+	if len(arguments) == 1 {
+		fmt.Printf("usage: permissions filename\n")
+		return
+	}
+	filename := arguments[1]
+	info, _ := os.Stat(filename)
+	mode := info.Mode()
+	fmt.Println(filename, "mode is", mode.String()[1:10])
+
+    $ go run permissions.go dataFile 
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Обработка сигналов в UNIX
+
+    пакет os/signal
+
+    $ kill -l    // узнать какие есть сигналы в системе
+
+Обработка двух сигналов    handleTwo.go.
+
+    func handleSignal(signal os.Signal) {
+        fmt.Println("handleSignal() Caught:", signal)
+    }
+        sigs := make(chan os.Signal, 1)
+        signal.Notify(sigs, os.Interrupt, syscall.SIGINFO)
+        go func() {
+            for {
+                sig := <-sigs
+                switch sig {
+                case os.Interrupt:
+                    fmt.Println("Caught:", sig)
+                case syscall.SIGINFO:
+                    handleSignal(sig)
+                    return
+                }
+            }
+        }()
+
+    $ go build handleTwo.go
+    $ ls -l handleTwo
+        -rwxr-xr-x  1 country  staff  2036578 17 янв 22:36 handleTwo
+    $ ./handleTwo
+        .Caught: interrupt
+        .handleSignal() Caught: information request
+        ...zsh: killed     ./handleTwo
+
+    в другом терминале:
+    $ ps ax | grep ./handleTwo | grep -v grep
+        4288 s000  S+     0:00.01 ./handleTwo
+    $ kill -s INT 4288
+    $ kill -s INFO 4288
+    $ kill -s USR1 4288
+    $ kill -9 4288
+
+Обработка всех сигналов    handleAll.go
+
+    func handle(signal os.Signal) {
+        fmt.Println("Received:", signal)
+    }
+        sigs := make(chan os.Signal, 1)
+        signal.Notify(sigs)
+        go func() {
+            for {
+                sig := <-sigs
+                switch sig {
+                case os.Interrupt:
+                    handle(sig)
+                case syscall.SIGTERM:
+                    handle(sig)
+                    os.Exit(0)
+                case syscall.SIGUSR2:
+                    fmt.Println("Handling syscall.SIGUSR2!")
+                default:
+                    fmt.Println("Ignoring:", sig)
+                }
+            }
+        }()
+
+    $ go build handleAll.go
+    $ ls -l handleAll
+        -rwxr-xr-x  1 country  staff  2036834 17 янв 22:49 handleAll
+    $ ./handleAll
+        ..Ignoring: hangup
+        Ignoring: urgent I/O condition
+        .Handling syscall.SIGUSR2!
+        Ignoring: user defined signal 1
+        .Received: interrupt
+        .Received: terminated
+
+    в другом терминале:
+    $ ps ax | grep ./handleAll | grep -v grep
+        4493 s000  S+     0:00.01 ./handleAll
+    $ kill -s HUP 4493
+    $ kill -s USR2 4493
+    $ kill -s USR1 4493
+    $ kill -s INT 4493
+    $ kill -s TERM 4493
+
+
+----------------------------------------------------------
+Программирование UNIX-каналов на Go
+
+    Для обозначения каналов UNIX используется символ |.
+
+----------------------------------------------------------
+Реализация утилиты cat(1) на Go    cat.go
+
+    $ go run cat.go     // без аргументов скопирует стандартный ввод в ст. вывод
+        Mastering Go!
+        Mastering Go!
+        1 2 3 4
+        1 2 3 4
+    $ go run cat.go dataFile | wc                                
+        10      10      48
+
+
+----------------------------------------------------------
+Структура syscall.PtraceRegs    ptraceRegs.go
+
+    syscall.PtraceRegs, в которой содержится информация о состоянии реестров.
+
+    Звездой утилиты ptraceRegs.go является функция syscall.PtraceGetRegs(). 
+    Для работы с реестрами существуют также функции syscall.PtraceSetRegs(), 
+    syscall.PtraceAttach(), syscall.PtracePeekData() и syscall.PtracePokeData()
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Отслеживание системных вызовов    traceSyscall.go    SYSCALLS
+
+    $ go run traceSyscall.go    // не работает на mac
+        # command-line-arguments
+        ./traceSyscall.go:36:19: undefined: syscall.PtraceRegs
+        ./traceSyscall.go:57:19: undefined: syscall.PtraceGetRegs
+        ./traceSyscall.go:70:17: undefined: syscall.PtraceSyscall
+
+
+----------------------------------------------------------
+Идентификаторы пользователя и группы    ids.go
+
+	fmt.Println("User id:", os.Getuid())
+
+	var u *user.User
+	u, _ = user.Current()
+	fmt.Print("Group ids: ")
+	groupIDs, _ := u.GroupIds()
+	for _, i := range groupIDs {
+		fmt.Print(i, " ")
+	}
+
+    $ go run ids.go
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Docker API и Go     dockerAPI.go
+
+    Эта утилита реализует команды docker ps и docker image ls. Первая команда
+    перечисляет все запущенные контейнеры, а вторая — все доступные образы на
+    локальном компьютере
+
+    export GO111MODULE = on
+
+    $ go run dockerAPI.go
 
 
 
 
-
-
-
-
-Стр. 386
+Стр. 426

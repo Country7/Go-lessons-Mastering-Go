@@ -1,0 +1,585 @@
+Конкурентность в Go: расширенные возможности
+
+----------------------------------------------------------
+И снова о планировщике Go
+
+    планировщик M:N
+    m горутин в n потоках ОС, использующих не более GOMAXPROCS
+
+    В Go используется модель конкурентности fork-join
+    fork (вилка), join (объединение)
+
+    Стратегия справедливого планирования
+
+узнать значение переменной среды GOMAXPROCS    maxprocs.go
+
+    runtime.GOMAXPROCS(0)
+
+    $ go run maxprocs.go
+        GOMAXPROCS: 10
+    $ export GOMAXPROCS=800; go run maxprocs.go
+        GOMAXPROCS: 800
+
+----------------------------------------------------------
+Ключевое слово select    select.go
+
+    Оператор select в Go похож на switch, но только для каналов.
+
+    !!! Самая большая проблема при использовании нескольких каналов 
+        и ключевого слова select — это взаимоблокировки
+
+    func gen(min, max int, createNumber chan int, end chan bool) {
+        for {
+            select {
+            case createNumber <- rand.Intn(max-min) + min:
+            case <-end:
+                close(end)
+                return
+            case <-time.After(4 * time.Second):
+                fmt.Println("\ntime.After()!")
+            }
+        }
+    }
+    Оператор select не выполняется последовательно, так как все его каналы
+    проверяются одновременно. Если ни один из каналов, указанных в операторе
+    select, не доступен, то оператор select будет заблокирован, пока не освободит-
+    ся один из каналов. Если доступны сразу несколько каналов оператора select,
+    то среда выполнения Go сделает случайный выбор из набора этих доступных каналов.
+
+    Обратите внимание, что операторы
+    select не требуют ветки default. В качестве «умной» ветки default в этом коде
+    можно рассматривать третью ветку оператора select. Так происходит потому,
+    что time.After() ожидает истечения заданного интервала, после чего передает
+    значение текущего времени по возвращаемому каналу — это разблокирует опе-
+    ратор select, если все остальные каналы по какой-либо причине окажутся за-
+    блокированными.
+
+    $ go run select.go 10
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Принудительное завершение горутины
+
+----------------------------------------------------------
+Принудительное завершение горутины, способ 1    timeOut1.go
+
+    func main() {
+        c1 := make(chan string)
+        go func() {
+            time.Sleep(time.Second * 3)
+            c1 <- "c1 OK"
+        }()
+        select {
+        case res := <-c1:
+            fmt.Println(res)
+        case <-time.After(time.Second * 1):
+            fmt.Println("timeout c1")
+        }
+
+        c2 := make(chan string)
+        go func() {
+            time.Sleep(3 * time.Second)
+            c2 <- "c2 OK"
+        }()
+        select {
+        case res := <-c2:
+            fmt.Println(res)
+        case <-time.After(4 * time.Second):
+            fmt.Println("timeout c2")
+        }
+    }
+
+    $ go run timeOut1.go
+        timeout c1
+        c2 OK
+
+----------------------------------------------------------
+Принудительное завершение горутины, способ 2    timeOut2.go
+
+    func timeout(w *sync.WaitGroup, t time.Duration) bool {
+        temp := make(chan int)
+        go func() {
+            time.Sleep(5 * time.Second)
+            defer close(temp)
+            w.Wait()
+        }()
+        select {
+        case <-temp:
+            return false
+        case <-time.After(t):
+            return true
+        }
+    }
+
+    func main() {
+        arguments := os.Args
+        var w sync.WaitGroup
+        w.Add(1)
+        t, err := strconv.Atoi(arguments[1])
+        duration := time.Duration(int32(t)) * time.Millisecond
+        fmt.Printf("Timeout period is %s\n", duration)
+
+        if timeout(&w, duration) {
+            fmt.Println("Timed out!")
+        } else {
+            fmt.Println("OK!")
+        }
+        w.Done()
+        if timeout(&w, duration) {
+            fmt.Println("Timed out!")
+        } else {
+            fmt.Println("OK!")
+        }
+    }
+
+    $ go run timeOut2.go 10000
+        Timeout period is 10s
+        Timed out!
+        OK!
+    $ go run timeOut2.go 100
+        Timeout period is 100ms
+        Timed out!
+        Timed out!
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+И снова о Go-каналах    closeNilChannel.go
+
+    если отправить
+    сообщение в закрытый канал, то программа перейдет в режим паники. Но если вы
+    попытаетесь прочитать данные из закрытого канала, то получите нулевое значение
+    для данного типа канала
+
+    var c chan string
+	close(c)
+    при попытке закрыть нулевой канал программа поднимет панику
+
+    нулевой канал всегда блокируется, то есть попытка
+    чтения или записи с нулевого канала заблокирует канал. Это свойство каналов
+    очень полезно в тех случаях, когда нужно отключить ветвь оператора select, — для
+    этого достаточно присвоить переменной канала значение nil
+
+    $ go run closeNilChannel.go
+        panic: close of nil channel
+
+----------------------------------------------------------
+Сигнальные каналы
+
+    Сигнальный канал — это канал, который применяется только для передачи сигналов.
+
+----------------------------------------------------------
+Буферизованные каналы    bufChannel.go
+
+    Буферизованные каналы. Это каналы, которые позволяют планировщику Go 
+    быстро размещать задания в очереди, чтобы обрабатывать больше запросов. 
+    Кроме того, их можно использовать в качестве семафоров, позволяющих 
+    ограничить пропускную способность приложения
+
+    numbers := make(chan int, 5)
+	counter := 10
+	for i := 0; i < counter; i++ {
+		select {
+		case numbers <- i:
+		default:
+			fmt.Println("Not enough space for", i)
+		}
+	}
+	for i := 0; i < counter+5; i++ {
+		select {
+		case num := <-numbers:
+			fmt.Println(num)
+		default:
+			fmt.Println("Nothing more to be done!")
+			break
+		}
+	}
+
+    $ go run bufChannel.go
+
+----------------------------------------------------------
+Нулевые каналы    nilChannel.go
+
+    func add(c chan int) {
+        sum := 0
+        t := time.NewTimer(time.Second)
+        for {
+            select {
+            case input := <-c:
+                sum = sum + input
+            case <-t.C:
+                c = nil
+                fmt.Println(sum)
+            }
+        }
+    }
+    func send(c chan int) {
+        for {
+            c <- rand.Intn(10)
+        }
+    }
+    func main() {
+        c := make(chan int)
+        go add(c)
+        go send(c)
+        time.Sleep(3 * time.Second)
+    }
+
+    $ go run nilChannel.go
+
+----------------------------------------------------------
+Каналы каналов    chSquare.go
+
+    c1 := make(chan chan int)
+
+    func f1(cc chan chan int, f chan bool) {
+        c := make(chan int)
+        cc <- c
+        defer close(c)
+
+	cc := make(chan chan int)
+
+	for i := 1; i < times+1; i++ {
+		f := make(chan bool)
+		go f1(cc, f)
+		ch := <-cc
+		ch <- i
+		for sum := range ch {
+			fmt.Print("Sum(", i, ")=", sum)
+		}
+		close(f)
+	}
+
+    $ go run chSquare.go 4
+        Sum(1)=1
+        Sum(2)=3
+        Sum(3)=6
+        Sum(4)=10
+
+
+----------------------------------------------------------
+Выбор последовательности исполнения горутин    defineOrder.go
+
+    func A(a, b chan struct{}) {
+        <-a
+        fmt.Println("A()!")
+        time.Sleep(time.Second)
+        close(b)
+    }
+
+
+----------------------------------------------------------
+Как не надо использовать горутины    sillySort.go
+
+	var wg sync.WaitGroup
+	for _, arg := range arguments[1:] {
+		n, err := strconv.Atoi(arg)
+		if err != nil || n < 0 {
+			fmt.Print(". ")
+			continue
+		}
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			time.Sleep(time.Duration(n) * time.Second)
+			fmt.Print(n, " ")
+		}(n)
+	}
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Общая память и общие переменные
+
+    Общая память и общие переменные — наиболее распространенные способы взаи-
+    модействия потоков UNIX между собой.
+    Переменные мьютекса (сокращенное mutual exclusion — «взаимное исключе-
+    ние») используются главным образом для синхронизации потоков и для защиты
+    общих данных, когда нужно исключить возможность одновременного выполне-
+    ния нескольких операций записи.
+
+    Код, который не может выполняться одновременно всеми процессами, потока-
+    ми или в данном случае горутинами, называется критическим разделом конкурент-
+    ной программы. Такой код должен быть защищен мьютексами.
+
+
+----------------------------------------------------------
+Тип sync.Mutex    mutex.go
+
+    type Mutex struct {
+        state int32
+        sema uint32
+    }
+
+    sync.Lock() и sync.Unlock()
+
+    var (
+        m  sync.Mutex
+        v1 int
+    )
+    func read() int {
+        m.Lock()
+        a := v1
+        m.Unlock()
+        return a
+    }
+
+----------------------------------------------------------
+Что произойдет, если вы забудете разблокировать мьютекс    forgetMutex.go
+
+    $ go run forgetMutex.go
+    Locked!
+    fatal error: all goroutines are asleep - deadlock!
+
+----------------------------------------------------------
+Тип sync.RWMutex    rwMutex.go
+
+    sync:
+    type RWMutex struct {
+        w Mutex // held if there are pending writers
+        writerSem uint32 // semaphore for writers to wait for completing readers
+        readerSem uint32 // semaphore for readers to wait for completing writers
+        readerCount int32 // number of pending readers
+        readerWait int32 // number of departing readers
+    }
+
+    Несмотря на то что только одной функции разрешается выполнять операции за-
+    писи с мьютексом sync.RWMutex, у нас может быть несколько функций, владеющих
+    мьютексом sync.RWMutex и выполняющих чтение.
+
+    Но пока все функции, читающие мьютекс типа sync.RWMutex, не разблокируют этот
+    мьютекс, вы не сможете заблокировать его для записи
+
+    RLock() и RUnlock() блокируют и разблокируют мьютекс для чтения
+    Lock() и Unlock()   блокируют и разблокируют мьютекс для записи (монопольная блокировка)
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пакет atomic   atom.go
+
+    Атомарная операция — это операция, которая выполняется за один шаг относи-
+    тельно других потоков или в данном случае других горутин. Таким образом, ато-
+    марная операция не может быть прервана на середине.
+
+    $ go run atom.go
+        20000
+    $ go run atom.go -x 4000 -y 10
+        40000
+
+    Результаты atom.go подтверждают, что счетчик, применяемый в программе, безопасен.
+
+    Если вместо atomic.AddInt64() применить обычную арифметику (counter.val++),
+    то в этом случае результаты программы были бы похожи на следующие:
+    $ go run atom.go -x 4000 -y 10
+        37613
+    $ go run atom.go
+        15247
+    Как видно из результатов, из-за counter.val++ поток программы становится небезопасным.
+
+----------------------------------------------------------
+----------------------------------------------------------
+Совместное использование памяти с помощью горутин   monitor.go
+
+    Управляющая горутина
+
+    var readValue = make(chan int)
+    var writeValue = make(chan int)
+    func set(newValue int) {
+        writeValue <- newValue
+    }
+    func read() int {
+        return <-readValue
+    }
+    func monitor() {
+        var value int
+        for {
+            select {
+            case newValue := <-writeValue:
+                value = newValue
+                fmt.Printf("%d ", value)
+            case readValue <- value:
+            }
+        }
+    }
+
+
+----------------------------------------------------------
+И снова об операторе go     cloGo.go
+
+    замкнутые переменные (closured variables) в горутинах
+
+    func main() {
+        for i := 0; i <= 20; i++ {
+            go func() {
+                fmt.Print(i, " ")
+            }()
+        }
+        time.Sleep(time.Second)
+        fmt.Println()
+    }
+
+    $ go run cloGo.go
+        4 21 21 21 21 21 21 21 21 6 21 21 21 21 21 21 21 21 21 21 21
+    $ go run cloGo.go
+        6 21 6 6 21 21 21 21 21 21 21 21 21 21 21 21 21 21 21 6 21
+
+    i — замкнутая переменная и поэтому определяется во время выполнения про-
+    граммы. Горутины создаются, но не запускаются, ожидая, пока их запустит пла-
+    нировщик Go. Тем временем цикл for заканчивается, поэтому значение i равно 21.
+    Кстати, эта же проблема относится и к каналам Go — будьте осторожны.
+
+----------------------------------------------------------
+Решение этой проблемы показано в программе   cloGoCorrect.go
+
+    func main() {
+        for i := 0; i <= 20; i++ {
+            i := i
+            go func() {
+                fmt.Print(i, " ")
+            }()
+        }
+        time.Sleep(time.Second)
+        fmt.Println()
+    }
+    i: = i создает новый экземпляр переменной для горутины
+
+    $ go run cloGoCorrect.go
+        1 5 4 3 6 0 13 7 8 9 10 11 12 17 14 15 16 19 18 20 2
+    $ go run cloGoCorrect.go
+        5 2 20 13 6 7 1 9 10 11 0 3 17 14 15 16 4 19 18 8 12
+
+----------------------------------------------------------
+еще один необычный случай использования оператора go    endlessComp.go
+
+    func main() {
+        var i byte
+        go func() {
+            for i = 0; i <= 255; i++ {
+            }
+        }()
+        fmt.Println("Leaving goroutine!")
+        runtime.Gosched()
+        runtime.GC()
+        fmt.Println("Good bye!")
+    }
+    эта программа никогда не заканчивается, потому что блокируется на неопределенный срок. 
+    Ее приходится останавливать вручную
+
+    $ go run endlessComp.go
+        Leaving goroutine!
+        ^Csignal: interrupt
+
+    При вызове функции runtime.Gosched() планировщику дается задание выполнить другую горутину, 
+    после чего мы вызываем сборщик мусора Go, который пытается выполнить свою работу
+    Чтобы сборщик мусора смог выполнить свою работу и заснуть, он должен пере-
+    брать все горутины. Однако проблема в том, что цикл for не закончится никогда,
+    потому что переменная for имеет тип byte. Это означает, что for не позволяет
+    системе делать что-либо еще, так как горутина, в которой находится цикл for, не за-
+    снет никогда. Этого неприятного обстоятельства не избежать, даже если у вашей
+    машины несколько ядер.
+    Обратите внимание: если бы for не был пустым, то программа была бы выпол-
+    нена и успешно завершилась, потому что сборщик мусора мог бы остановиться.
+    И наконец, имейте в виду, что для того чтобы горутина завершилась, нужен
+    четкий сигнал о ее завершении. Проще всего завершить горутину с помощью
+    обычного оператора return.
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Распознавание состояния гонки    raceC.go     noRaceC.go
+
+    Состояние гонки по данным — это ситуация, когда два и более работающих элемента,
+    таких как потоки и горутины, пытаются получить контроль над общим ресурсом
+    или переменной программы либо изменить их. Строго говоря, гонка по данным
+    происходит тогда, когда две или более инструкции обращаются к одному и тому же
+    адресу памяти и хотя бы одна из них выполняет операцию записи. Если все опера-
+    ции являются чтением, то состояния гонки нет.
+
+    -race при запуске или сборке исходного файла Go включает детектор гонки Go
+
+    $ go run raceC.go 10 
+        k = map[int]int{1:12, 2:10, 7:7, 10:10}
+    $ go run -race raceC.go 10
+        ==================
+        WARNING: DATA RACE
+
+    $ go run noRaceC.go 10
+        k = map[int]int{0:0, 1:1, 2:10, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:9}
+    $ go run -race noRaceC.go 10
+        k = map[int]int{0:0, 1:1, 2:10, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8, 9:9}
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пакет context    simpleContext.go
+
+    Главное назначение пакета context — определение типа Context 
+    и поддержка аннулирования
+
+    Context — это интерфейс, имеющий четыре метода: 
+    Deadline(), Done(), Err() и Value()
+
+    изменить переменную Context, используя такие функции, как 
+    context.WithCancel(), context.WithDeadline() и context.WithTimeout()
+
+    Эти три функции возвращают производный (дочерний) объект Context и функцию
+    CancelFunc. Вызов функции CancelFunc удаляет ссылку родителя на дочерний
+    объект и останавливает все связанные с ним таймеры
+
+    Для инициализации пустого объекта Context нужно вызвать context.Background()
+
+    Context.Done() является каналом
+
+    c1 := context.Background()
+    c1, cancel := context.WithCancel(c1)
+    c2, cancel := context.WithTimeout(c2, time.Duration(t)*time.Second)
+    deadline := time.Now().Add(time.Duration(2*t) * time.Second)
+	c3, cancel := context.WithDeadline(c3, deadline)
+
+----------------------------------------------------------
+Расширенный пример использования пакета context    useContext.go
+
+    веб-сервер slowWWW.go
+
+    $ go run slowWWW.go         
+        Using default port number:  :8001
+        Served: localhost:8001
+
+    $ time go run useContext.go http://localhost:8001/ 10
+        Delay: 10
+        Connecting to http://localhost:8001/ 
+        Server Response: Serving: /
+        Delay: 4
+        Exiting...
+        go run useContext.go http://localhost:8001/ 10  0,22s user 0,26s system 10% cpu 4,359 total
+
+----------------------------------------------------------
+Еще один пример использования пакета context    moreContext.go
+
+    context.TODO()
+
+    $ go run moreContext.go
+        found value: mySecretValue
+        key not found: notThere
+        key not found: notThere
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Пулы обработчиков    workerPool.go
+
+    Пул обработчиков — это множество потоков, предназначенных для обработки на-
+    значаемых им заданий
+
+    $ go run workerPool.go 15 5
+        Capacity of clients: 10
+        Capacity of data: 10
+        Client ID: 4	int: 4	square: 16
+        ...
+
+
+
+
+Стр. 508

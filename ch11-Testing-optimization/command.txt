@@ -4,6 +4,7 @@
 Оптимизация кода Go
 
 ----------------------------------------------------------
+----------------------------------------------------------
 Профилирование кода Go
 
     стандартный Go пакет runtime/pprof - низкого уровня
@@ -31,7 +32,6 @@
         list main.N1  // что происходит с каждой отдельной функцией
         pdf //  создать PDF-файл данных профилирования, понадобится программа Graphviz
 
-
 ----------------------------------------------------------
 Удобный внешний пакет для профилирования    betterProfile.go
 
@@ -46,15 +46,17 @@
     $ go run betterProfile.go
     $ go tool pprof /tmp/cpu.pprof
 
-
-----------------------------------------------------------
 ----------------------------------------------------------
 Веб-интерфейс Go-профилировщика
 
+    MacOS:
     Чтобы пользовательский веб-интерфейс смог работать, необходимо установить Graphviz
     https://www.macports.org/install.php скачать MacPorts-2.9.1-14-Sonoma.pkg и установить
     перезагрузить
     $ sudo port install graphviz
+
+    Ubuntu:
+    $ sudo apt install graphviz
 
     Интерактивный профилировщик Go запускается с помощью такой команды:
     $ go tool pprof -http=[host]:[port] aProfile
@@ -69,8 +71,6 @@
 
     открыватся браузер http://localhost:8080/ui/
 
-
-----------------------------------------------------------
 ----------------------------------------------------------
 Коротко об основах Graphviz    graph.dot
 
@@ -88,6 +88,74 @@
      с помощью команды go test -trace
 
     $ go doc runtime/trace
+
+    f, err := os.Create("/tmp/traceFile.out")
+    defer f.Close()
+    err = trace.Start(f)
+    defer trace.Stop()
+
+    $ go run goGC.go
+    $ go tool trace /tmp/traceFile.out
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Тестирование кода Go
+
+    ф-ции тесторования содержаться в файлах, заканчивающихся на _test.go 
+    Функция тестирования начинается с Test
+    стандартный Go-пакет testing
+    подкоманда go test
+
+----------------------------------------------------------
+Написание тестов для существующего кода Go    testMe.go  testMe_test.go
+
+    $ go test testMe.go testMe_test.go -v
+    параметр -v дает расширенный вывод
+    запустить тест несколько раз подряд параметр -count
+    $ go test testMe.go testMe_test.go -count 2
+    только некоторые тесты параметр -run
+    $ go test testMe.go testMe_test.go -run='F2' -v
+
+----------------------------------------------------------
+Тестовое покрытие кода    cover/codeCover.go  codeCover_test.go
+
+    $ cd cover 
+    $ go test -cover -v
+        для -cover не требуется флаг -v
+
+    $ go test -coverprofile=coverage.out
+    $ go tool cover -func=coverage.out
+    $ go tool cover -html=coverage.out    // исп. браузер для анализа файла
+    $ go tool cover -html=coverage.out -o output.html  // сохранить html отчет
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Тестирование HTTP-сервера с базой данных    webServer.go webServer_test.go
+
+    $ go get github.com/lib/pq   // загрузить пакет для работы с PostgreSQL из Go
+
+    установка PostgreSQL на Ubuntu:
+    sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+    sudo apt-get update
+    sudo apt-get -y install postgresql
+
+    установка графической оболочки для работы с PostgreSQL:
+    sudo apt  install curl
+    curl -fsS https://www.pgadmin.org/static/packages_pgadmin_org.pub | sudo gpg --dearmor -o /usr/share/keyrings/packages-pgadmin-org.gpg
+    sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/packages-pgadmin-org.gpg] https://ftp.postgresql.org/pub/pgadmin/pgadmin4/apt/$(lsb_release -cs) pgadmin4 main" > /etc/apt/sources.list.d/pgadmin4.list && apt update'
+    sudo apt install pgadmin4
+
+
+
+
+    создать базу данных PostgreSQL с именем s2
+    $ psql -p 5432 -h localhost -U postgres -c "CREATE DATABASE s2" CREATE DATABASE
+
+
+
 
 
 

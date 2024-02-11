@@ -1,0 +1,321 @@
+Основы сетевого программирования на Go
+
+----------------------------------------------------------
+Что такое net/http, net и http.RoundTripper
+
+    пакет net/http
+    Методы http.Set() и http.Get()
+    функция http.ListenAndServe()
+    пакет net
+    http.RoundTripper — это интерфейс, который позволяет создавать элементы Go, 
+        способные выполнять HTTP-транзакции
+
+----------------------------------------------------------
+Тип http.Response
+
+    // ответ на запрос
+    type Response struct {
+        Status string // e.g. "200 OK"
+        StatusCode int // e.g. 200
+        Proto string // e.g. "HTTP/1.0"
+        ProtoMajor int // e.g. 1
+        ProtoMinor int // e.g. 0
+        Header Header
+        Body io.ReadCloser
+        ContentLength int64
+        TransferEncoding []string
+        Close bool
+        Uncompressed bool
+        Trailer Header
+        Request *Request
+        TLS *tls.ConnectionState
+    }
+
+----------------------------------------------------------
+Тип http.Request
+
+    // запрос 
+    type Request struct {
+        Method string
+        URL *url.URL
+        Proto string // "HTTP/1.0"
+        ProtoMajor int // 1
+        ProtoMinor int // 0
+        Header Header
+        Body io.ReadCloser
+        GetBody func() (io.ReadCloser, error)
+        ContentLength int64
+        TransferEncoding []string
+        Close bool
+        Host string
+        Form url.Values
+        PostForm url.Values
+        MultipartForm *multipart.Form
+        Trailer Header
+        RemoteAddr string
+        RequestURI string
+        TLS *tls.ConnectionState
+        Cancel <-chan struct{}
+        Response *Response
+        ctx context.Context
+    }
+
+----------------------------------------------------------
+Тип http.Transport
+
+    type Transport struct {
+        idleMu sync.Mutex
+        wantIdle bool
+        idleConn map[connectMethodKey][]*persistConn
+        idleConnCh map[connectMethodKey]chan *persistConn
+        idleLRU connLRU
+        reqMu sync.Mutex
+        reqCanceler map[*Request]func(error)
+        altMu sync.Mutex
+        altProto atomic.Value
+        ...
+    }
+
+    http.Transport — довольно низкоуровневый тип данных, в то время как структура
+    http.Client, которая также используется в этой главе, реализует HTTP-клиент
+    высокого уровня
+
+----------------------------------------------------------
+Что такое TCP/IP
+
+    Transmission Control Protocol / Internet Protocol
+
+    Протокол UDP (User Datagram Protocol, протокол передачи датаграмм)
+
+----------------------------------------------------------
+Что такое IPv4 и IPv6
+
+    IPv4  10.20.32.245 (32 бита)
+    IPv6  3fce:1706:4523:3:150:f8ff:fe21:56cf  (128 бит)
+
+----------------------------------------------------------
+Утилита командной строки nc(1)
+
+    netcat(1) - очень удобна для тестирования серверов и клиентов TCP/IP
+
+    IP-адрес 10.10.1.123 и прослушивает номер порта 1234:
+    $ nc 10.10.1.123 1234
+
+    По умолчанию nc(1) использует протокол TCP. Но если выполнить nc(1)
+    с флагом -u, то nc(1) будет использовать протокол UDP
+
+    Если установить параметр -l, то netcat(1) будет действовать как сервер, то есть
+    начнет прослушивать соединения с заданным номером порта.
+    Наконец, netcat(1) с параметрами -v и -vv будет генерировать подробный отчет,
+    который пригодится при устранении неполадок в сетевых подключениях.
+
+----------------------------------------------------------
+Чтение конфигурации сетевых интерфейсов    netConfig.go  netCapabilities.go
+
+    $ go run netConfig.go
+
+    type Interface struct {
+        Index int
+        MTU int
+        Name string
+        HardwareAddr HardwareAddr
+        Flags Flags
+    }
+
+    $ go run netCapabilities.go
+
+    $   // параметры шлюза, используемого на компьютере по умолчанию
+
+    можно использовать команду netstat -nr с помощью функции exec.Command(), 
+    получив результат через канал, или из функции exec.CombinedOutput() 
+    и обработав его как текст средствами Go
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Выполнение DNS-поиска    DNS.go
+
+    Domain Name System
+
+    input := arguments[1]
+	IPaddress := net.ParseIP(input)
+    hosts, err := net.LookupAddr(address)
+    IPs, err := net.LookupHost(hostname)
+
+    $ go run DNS.go 127.0.0.1
+    $ go run DNS.go 192.168.1.1
+    $ go run DNS.go google.com
+
+----------------------------------------------------------
+Получение NS-записей домена    Nsrecords.go
+
+    NS-записи - поиск серверов доменных имен (name servers)
+
+    NSs, err := net.LookupNS(domain)
+
+    $ go run NSrecords.go samoychiteli.ru
+    чтобы проверить:
+    $ host -t ns samoychiteli.ru
+
+----------------------------------------------------------
+Получение MX-записей домена    MXrecords.go
+
+    MX-записи указывают на почтовые серверы (mail servers) домена
+
+    MXs, err := net.LookupMX(domain)
+
+    $ go run MXrecords.go golang.com
+    проверочка:
+    $ host -t mx golang.com
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Создание веб-сервера на Go    www.go
+
+    можно создать свой, но есть мощьные:
+    Apache, Nginx или Candy, тоже написанные на Go
+
+    err := http.ListenAndServe(PORT, nil)  // для запуска сервера
+
+    $ go run www.go
+
+    http://localhost:8001
+    http://localhost:8001/time
+
+----------------------------------------------------------
+Использование пакета atomic    atomWWW.go
+
+    $ go run atomWWW.go
+
+    var count int32
+    atomic.AddInt32(&count, 1)
+    temp := atomic.LoadInt32(&count)
+	fmt.Println("Count:", temp)
+	fmt.Fprintf(w, "<h1 align=\"center\">%d</h1>", count)
+
+    $ ab -n 1500 -c 100 http://localhost:8080/
+    // команда ab(1) отправляет 1500 запросов, при этом количество
+        одновременных запросов равно 100  - (ApacheBench)
+
+    // После выполнения ab(1) посетите адрес /getCounter
+    $ wget -qO- http://localhost:8080/getCounter
+    // либо перейти по ссылке http://localhost:8080/getCounter
+
+----------------------------------------------------------
+Профилирование HTTP-сервера    wwwProfile.go
+
+    пакет Go net/http/pprof
+
+    профилировщик работает с адресом http://localhost:8080, 
+    вы автоматически получите поддержку следующих веб-ссылок:
+        http://localhost:8080/debug/pprof/goroutine;
+        http://localhost:8080/debug/pprof/heap;
+        http://localhost:8080/debug/pprof/threadcreate;
+        http://localhost:8080/debug/pprof/block;
+        http://localhost:8080/debug/pprof/mutex;
+        http://localhost:8080/debug/pprof/profile;
+        http://localhost:8080/debug/pprof/trace?seconds=5
+
+    r := http.NewServeMux()
+    r.HandleFunc("/time", timeHandler)
+	r.HandleFunc("/", myHandler)
+	r.HandleFunc("/debug/pprof/", pprof.Index)
+    err := http.ListenAndServe(PORT, r)
+
+    $ go run wwwProfile.go 1234
+
+    // для использования профилировщика запускаем команду:
+    $ go tool pprof http://localhost:1234/debug/pprof/profile
+        Entering interactive mode (type "help" for commands, "o" for options)
+        (pprof) top
+    // Теперь мы можем применять данные профилирования 
+        и анализировать их с помощью инструмента go pprof
+    
+    Чтобы узнать результаты профилирования, посетите страницу http://localhost:1234/debug/pprof
+
+    Протестировать производительность веб-серверного приложения можно
+    с помощью утилиты ab(1) - (ApacheBench)
+
+    $ ab -k -c 10 -n 100000 "http://127.0.0.1:1234/time"
+
+----------------------------------------------------------
+Создание веб-сайта на Go   kvWeb.go home.gohtml insert.gohtml update.gohtml
+
+    можно читать значения из полей HTML-формы с помощью FormValue(). 
+    Функция template.Must() — это вспомогательная функция,
+    которая гарантирует, что предоставленный файл шаблона не содержит ошибок
+
+    {{if .Success}}
+        <h1>Element updated!</h1>
+    {{else}}
+        ...
+    {{end}}
+
+    myT := template.Must(template.ParseGlob("home.gohtml"))
+	myT.ExecuteTemplate(w, "home.gohtml", nil)
+
+	tmpl := template.Must(template.ParseFiles("update.gohtml"))
+	if r.Method != http.MethodPost {
+		tmpl.Execute(w, nil)
+		return
+	}
+    ...
+        tmpl.Execute(w, struct{ Success bool }{true})
+
+    $ go run kvWeb.go 
+    http://localhost:8001/
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+HTTP-трассировка    httpTrace.go
+
+    пакет net/http/httptrace
+
+    $ go run kvWeb.go
+
+    $ go run httpTrace.go http://localhost:8001/
+
+----------------------------------------------------------
+Тестирование HTTP-обработчиков    testWWW.go
+
+    пакет net/http/httptest
+
+    $ go test testWWW.go testWWW_test.go -v --count=1
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Создание веб-клиента на Go    webClient.go
+
+    data, err := http.Get(URL)
+
+    $ go run webClient.go http://www.mtsoukalos.eu/ | head -20
+
+----------------------------------------------------------
+Как усовершенствовать наш веб-клиент Go    advancedWebClient.go
+
+	c := &http.Client{
+		Timeout: 15 * time.Second,
+	}
+	request, err := http.NewRequest(http.MethodGet, URL.String(), nil)
+	httpData, err := c.Do(request)
+
+    Строку "GET" в вызове http.NewRequest() можно заменить на http.MethodGet
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Стр. 621

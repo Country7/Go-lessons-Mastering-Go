@@ -148,21 +148,185 @@
     sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/packages-pgadmin-org.gpg] https://ftp.postgresql.org/pub/pgadmin/pgadmin4/apt/$(lsb_release -cs) pgadmin4 main" > /etc/apt/sources.list.d/pgadmin4.list && apt update'
     sudo apt install pgadmin4
 
+    установка PostgreSQL и графической оболочки на MacOS:
+    https://www.postgresql.org/download/macosx/
 
-
+    psql --version
+    в pgAdmin4 запускаем сервер
 
     создать базу данных PostgreSQL с именем s2
-    $ psql -p 5432 -h localhost -U postgres -c "CREATE DATABASE s2" CREATE DATABASE
+    $ psql -p 5432 -h localhost -U postgres -c "CREATE DATABASE s2" CREATE DATABASE    // не сработало
+    $ psql -p 5432 -h localhost -U postgres -c "CREATE DATABASE s2"  // а так сработало
+        Password for user postgres: 
+        CREATE DATABASE
+
+    $ go test webServer* -v   // команда приведет к ошибке авторизации
+        === RUN   Test_count
+        pq: password authentication failed for user "postgres"
+        pq: password authentication failed for user "postgres"
+    в файлах webServer.go webServer_test.go строку и конфигурацией соединения:
+        connStr := "user=postgres dbname=s2 sslmode=disable"
+    допиливаем паролем:
+        connStr := "user=postgres dbname=s2 sslmode=disable password=postgres"
+    тогда будет порядок:
+    $ go test webServer* -v
+        === RUN   Test_count
+        --- PASS: Test_count (0.08s)
+        === RUN   Test_queryDB
+        --- PASS: Test_queryDB (0.04s)
+        === RUN   Test_record
+        Serving: /getdata
+        Served: 
+        --- PASS: Test_record (0.03s)
+        PASS
+        ok  	command-line-arguments	0.403s
+    Если опустить параметр -v, то получим более короткий вывод
+
+----------------------------------------------------------
+Пакет testing/quick  randomBuiltin.go   quick.go и quick_test.go  too_long.go и too_long_test.go
+
+    тестирование методом «черного ящика»
+    $ go run randomBuiltin.go
+
+    $ go test -v quick*
+    $ go test -v quick* -count=1    //  тестирование с выключенным кешированием
+
+    $ go test too_long* -v -timeout 15s   // с ограничением по времени
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Бенчмаркинг кода Go
+
+    имя функции для бенчмаркинга должно начинаться с Benchmark
+    имена программ заканчиваются на _test.go
+
+----------------------------------------------------------
+Простой пример бенчмаркинга  benchmarkMe.go  benchmarkMe_test.go
+
+    !!! Benchmark30fibo1() является допустимым именем функции бенчмаркинга, 
+    а BenchmarkfiboIII() — нет, потому что после слова Benchmark 
+    не стоит заглавная буква или цифра. Это очень важно, так как функция
+    бенчмаркинга с некорректным именем не будет запускаться автоматически
+
+    $ go test -bench=. benchmarkMe.go benchmarkMe_test.go
+
+    . — это регулярное выражение, которое соответствует всем допустимым
+    функциям бенчмаркинга. Во-вторых, если опустить параметр -bench, то ни одна
+    функция бенчмаркинга не будет выполнен
+
+    $ go test -benchmem -bench=. benchmarkMe.go benchmarkMe_test.go
+    // включить в результаты бенчмаркинга статистику выделения памяти
+
+----------------------------------------------------------
+Бенчмаркинг буферизованной записи   writingBU.go  writeBU_test.go
+
+    $ time go run writingBU.go 1 100000
+    $ time go run writingBU.go 10 100000
+
+    $ go test -bench=. writingBU.go writingBU_test.go
+    $ go test -bench=. writingBU.go writingBU_test.go -benchmem
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Обнаружение недоступного кода Go    cannotReach.go
+
+    $ go run cannotReach.go
+
+    $ go vet cannotReach.go
+        # command-line-arguments
+        ./cannotReach.go:10:2: unreachable code
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Кросс-компиляция    xCompile.go
+
+    fmt.Print("You are using ", runtime.Compiler, " ")
+	fmt.Println("on a", runtime.GOARCH, "machine")
+	fmt.Println("with Go version", runtime.Version())
+
+    $ go run xCompile.go
+        You are using gc on a arm64 machine
+        with Go version go1.20.4
+
+    Для кросс-компиляции исходного файла Go необходимо присвоить переменным 
+    среды GOOS и GOARCH значения, соответствующие той операционной системе
+    и архитектуре, для которых компилируется программа
+
+    $ env GOOS=linux GOARCH=arm go build xCompile.go
+    $ file xCompile
+        xCompile: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), statically linked, 
+        Go BuildID=lGiYN6tE72uEsJytpjoZ/59s3w7y90xxm6isR3ZYn/v70z_rP_gifolhfxiiLK/QDtfvwvYJvL17ZFNQ8pj, 
+        with debug_info, not stripped
+    $ ./xCompile
+        zsh: exec format error: ./xCompile
+
+    $ env GOOS=linux GOARCH=386 go build xCompile.go
+    $ file xCompile
+        xCompile: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), statically linked, 
+        Go BuildID=VyUwxZS35UcZlZ31y6rE/xWis7X5gdlo4jRIBUppw/SyIXMkcnPQ0IE_0Dwq8o/uTwjMS1ROSA6BFeCiwyP, 
+        with debug_info, not stripped
+    $ ./xCompile
+        zsh: exec format error: ./xCompile
+    
+    $ env GOOS=windows GOARCH=arm64 go build xCompile.go
+
+    https://golang.org/doc/install/source  // Список доступных значений переменных среды GOOS и GOARCH
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Создание примеров функций    ex.go  ex_test.go
+
+    https://golang.org/pkg/io/#example_Copy
+    https://play.golang.org/
+
+    $ go test ex.go ex_test.go -v
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+От кода Go до машинного кода    machineCode.go
+
+    // программа machineCode.go, переведенная в машинный код
+    $ GOSSAFUNC=main GOOS=linux GOARCH=amd64 go build -gcflags "-S" machineCode.go
+        # runtime
+        dumped SSA to /Users/country/MyProjects/Go_project/src/Mastering-Go/ch11-Testing-optimization/ssa.html
+        # command-line-arguments
+        dumped SSA to ./ssa.html
+        ...
+
+----------------------------------------------------------
+Использование ассемблера в Go    asm/add_me.go
+
+    $ GOOS=darwin GOARCH=amd64 go tool compile -S add_me.go   
+    $ go build   // не работает
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Генерация документации    documentMe.go  documentMe_test.go
+
+    $ mkdir ~/go/src/documentMe
+    $ cp documentMe* ~/go/src/documentMe/
+    $ ls -l ~/go/src/documentMe/
+
+    $ go install documentMe
+    $ cd ~/go/pkg/darwin_amd64
+    $ ls -l documentMe.a
+
+    $ godoc -http=":8080"
+
+    $ go test -v documentMe*
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Использование образов Docker    Docker/Dockerfile  Docker/webServer.go
 
 
 
 
-
-
-
-
-
-
-
-
-Стр. 528
+Стр. 579

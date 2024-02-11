@@ -10,7 +10,7 @@ import (
 )
 
 func create_table() {
-	connStr := "user=postgres dbname=s2 sslmode=disable"
+	connStr := "user=postgres dbname=s2 sslmode=disable password=postgres"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		fmt.Println(err)
@@ -32,7 +32,7 @@ func create_table() {
 }
 
 func drop_table() {
-	connStr := "user=postgres dbname=s2 sslmode=disable"
+	connStr := "user=postgres dbname=s2 sslmode=disable password=postgres"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		fmt.Println(err)
@@ -48,7 +48,7 @@ func drop_table() {
 }
 
 func insert_record(query string) {
-	connStr := "user=postgres dbname=s2 sslmode=disable"
+	connStr := "user=postgres dbname=s2 sslmode=disable password=postgres"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		fmt.Println(err)
@@ -70,7 +70,7 @@ func Test_count(t *testing.T) {
 	insert_record("INSERT INTO users (first_name, last_name) VALUES ('Mihalis', 'Tsoukalos')")
 	insert_record("INSERT INTO users (first_name, last_name) VALUES ('Mihalis', 'Unknown')")
 
-	connStr := "user=postgres dbname=s2 sslmode=disable"
+	connStr := "user=postgres dbname=s2 sslmode=disable password=postgres"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		fmt.Println(err)
@@ -90,7 +90,7 @@ func Test_count(t *testing.T) {
 func Test_queryDB(t *testing.T) {
 	create_table()
 
-	connStr := "user=postgres dbname=s2 sslmode=disable"
+	connStr := "user=postgres dbname=s2 sslmode=disable password=postgres"
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		fmt.Println(err)

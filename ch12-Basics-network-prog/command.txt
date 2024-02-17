@@ -304,18 +304,137 @@ HTTP-трассировка    httpTrace.go
 
     Строку "GET" в вызове http.NewRequest() можно заменить на http.MethodGet
 
+    http.NewRequest() возвращает объект http.Request
+
+    http.Do() отправляет HTTP-запрос (http.Request) посредством http.Client 
+    и получает HTTP-ответ (http.Response). Таким образом, 
+    http.Do() делает то же самое, что http.Get(), но более подробно
+
+    $ go run advancedWebClient.go http://www.google.com
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Задержки HTTP-соединений   clientTimeOut.go.
+
+    func Timeout(network, host string) (net.Conn, error) {
+        conn, err := net.DialTimeout(network, host, timeout)
+        conn.SetDeadline(time.Now().Add(timeout))
+        return conn, nil
+    }
+	t := http.Transport{
+		Dial: Timeout,
+	}
+	client := http.Client{
+		Transport: &t,
+	}
+	data, err := client.Get(URL)
+
+    Мы протестируем веб-клиент clientTimeOut.go с помощью веб-сервера
+    slowWWW.go, разработанного в главе 10
+
+    $ go run slowWWW.go
+
+    $ go run clientTimeOut.go http://localhost:8001
+        Get "http://localhost:8001": read tcp [::1]:52030->[::1]:8001: i/o timeout
+    $ go run clientTimeOut.go http://localhost:8001 5
+        Serving: /
+        Delay: 2
+
+----------------------------------------------------------
+Подробнее о SetDeadline
+
+    SetDeadline() используется в пакете net для того, чтобы задать максимальную 
+    длительность операций чтения и записи для данного сетевого соединения.
+    Специфика работы функции SetDeadline() такова, что ее необходимо вызвать
+    перед любой операцией чтения или записи
+
+----------------------------------------------------------
+Установка периода ожидания на стороне сервера    serverTimeOut.go
+
+	m := http.NewServeMux()
+	srv := &http.Server{
+		Addr:         PORT,
+		Handler:      m,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
+	}
+	m.HandleFunc("/time", timeHandler)
+	m.HandleFunc("/", myHandler)
+	err := srv.ListenAndServe()
+
+    $ go run serverTimeOut.go 
+
+    Команду nc(1), которая в данном случае играет роль фиктивного HTTP-клиента, 
+    который подключается к serverTimeOut.go, необходимо выполнить в следующем формате:
+    $ time nc localhost 8001
+
+----------------------------------------------------------
+Еще один способ определить период ожидания   anotherTimeOut.go
+
+	client := http.Client{
+		Timeout: timeout,
+	}
+	client.Get(URL)
+
+    $ go run slowWWW.go
+
+    $ go run anotherTimeOut.go http://localhost:8001
+        Get "http://localhost:8001": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+    $ go run anotherTimeOut.go http://localhost:8001 15
+        Serving: /
+        Delay: 7
+
+
+----------------------------------------------------------
+Инструменты Wireshark и tshark
+
+    tshark — версиz Wireshark с интерфейсом командной строки
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Go и gRPC
+
+    gRPC — это протокол, основанный на HTTP/2
+
+----------------------------------------------------------
+Определение файла описания интерфейса
+
+    установка Homebrew на mac
+    $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+    установка protobuf с помощью Homebrew
+    $ brew install protobuf
+
+    обеспечить поддержку protobuf в Go
+    $ go mod init basics-network
+    $ go get -u github.com/golang/protobuf/protoc-gen-go
+
+    // пока что не будем делать так: в файле .zshrc добавить строку export PATH=$PATH:~/go/bin
+
+    $ protoc -I . --go_out=plugins=grpc:. api.proto   // не работает никак
+
+    $ go get github.com/mactsouk/protobuf
+
+----------------------------------------------------------
+gRPC-клиент    gClient.go
+
+    $ go get -u github.com/golang/protobuf/protoc-gen-go
+        go: module github.com/golang/protobuf is deprecated: Use the "google.golang.org/protobuf" module instead.
+
+----------------------------------------------------------
+gRPC-сервер    gServer.go
+
+    $ go run gServer.go
+    Serving requests...
+    Request Text: My Message!
+    Request SubText: New Message!
+
+    $ go run gClient.go
+    Response Text: My Message!
+    Response SubText: Got it!
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-Стр. 621
+Стр. 637

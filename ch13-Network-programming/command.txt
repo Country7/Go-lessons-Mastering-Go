@@ -1,0 +1,66 @@
+Сетевое программирование: создание серверов и клиентов
+
+----------------------------------------------------------
+----------------------------------------------------------
+Работа с HTTPS-трафиком
+
+----------------------------------------------------------
+Создание сертификатов
+
+    создать сертификат для сервера на macOS:
+    $ openssl genrsa -out server.key 2048
+    $ openssl ecparam -genkey -name secp384r1 -out server.key
+    $ openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
+
+    создать сертификат для клиента на macOS:
+    $ openssl req -x509 -nodes -newkey rsa:2048 -keyout client.key -out client.crt -days 3650 -subj "/"
+
+    если сертификат является самозаверяющим, как тот, который мы только 
+    что создали, для работы HTTPS-клиента нужно использовать
+    параметр InsecureSkipVerify: true в структуре http.Transport 
+
+----------------------------------------------------------
+HTTPS-клиент    httpsClient.go
+
+    пакет crypto/tls  - протокол безопасности на транспортном уровне 
+    (Transport Layer Security, TLS)
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{},
+	}
+	client := &http.Client{Transport: tr}
+	response, err := client.Get(URL)
+	defer response.Body.Close()
+	content, _ := ioutil.ReadAll(response.Body)
+	s := strings.TrimSpace(string(content))
+
+    $ go run httpsClient.go https://www.google.com
+
+----------------------------------------------------------
+Простой HTTPS-сервер    https.go
+
+    func Default(w http.ResponseWriter, req *http.Request) {
+        fmt.Fprintf(w, "This is an example HTTPS server!\n")
+    }
+	http.HandleFunc("/", Default)
+	err := http.ListenAndServeTLS(PORT, "server.crt", "server.key", nil)
+
+    $ go run https.go
+    $ go run httpsClient.go https://localhost:1443
+        Get "https://localhost:1443": tls: failed to verify certificate: x509: 
+        “Internet Widgits Pty Ltd” certificate is not standards compliant
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Стр. 643

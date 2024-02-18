@@ -22,7 +22,9 @@
 ----------------------------------------------------------
 HTTPS-клиент    httpsClient.go
 
-    пакет crypto/tls  - протокол безопасности на транспортном уровне 
+    протокол защиты информации Secure Sockets Layer (SSL)
+
+    пакет crypto/tls  - протокол безопасности на ТРАНСПОРТНОМ уровне 
     (Transport Layer Security, TLS)
 
 	tr := &http.Transport{
@@ -50,6 +52,415 @@ HTTPS-клиент    httpsClient.go
         Get "https://localhost:1443": tls: failed to verify certificate: x509: 
         “Internet Widgits Pty Ltd” certificate is not standards compliant
 
+    HTTPS-сервер, разработанный в этом разделе, использует HTTPS через SSL,
+    а это не самый безопасный вариант. Лучше использовать TLS — в следующем
+    подразделе рассмотрена реализация на Go HTTPS-сервера, использующего TLS
+
+----------------------------------------------------------
+Разработка TLS-сервера и TLS-клиента    TLSserver.go  httpsClient.go  TLSclient.go
+
+    type handler struct {}
+    func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+        w.Write([]byte("Hello world!\n"))
+    }
+
+	caCert, err := ioutil.ReadFile("client.crt")
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	cfg := &tls.Config{
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		ClientCAs:  caCertPool,
+	}
+	srv := &http.Server{
+		Addr:      PORT,
+		Handler:   &handler{},
+		TLSConfig: cfg,
+	}
+	fmt.Println(srv.ListenAndServeTLS("server.crt", "server.key"))
+
+    $ go run httpsClient.go https://localhost:1443
+        Get "https://localhost:1443": tls: failed to verify certificate: x509: 
+        “Internet Widgits Pty Ltd” certificate is not standards complian
+
+    $ go run TLSserver.go
+        Listening to port number :1443
+        2024/02/18 18:31:33 http: TLS handshake error from [::1]:49354: remote error: tls: bad certificate
+
+
+    для того чтобы HTTPS-клиент httpsClient.go успешно взаимодействовал
+    с TLSserver.go, который использует самозаверенный сертификат,
+    необходимо добавить в структуру http.Transport параметр 
+    InsecureSkipVerify: true. Версия httpsClient.go, которая работает с 
+    TLSserver.go и содержит InsecureSkipVerify: true, сохранена в файле TLSclient.go
+
+	caCert, err := ioutil.ReadFile("server.crt")
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	cert, err := tls.LoadX509KeyPair("client.crt", "client.key")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:            caCertPool,
+				InsecureSkipVerify: true,
+				Certificates:       []tls.Certificate{cert},
+			},
+		},
+	}
+	resp, err := client.Get(URL)
+	htmlData, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	fmt.Printf("%v\n", resp.Status)
+	fmt.Printf(string(htmlData))
+
+    Здесь показано использование InsecureSkipVerify
+
+    подключить TLSclient.go к TLSserver.go
+    $ go run TLSclient.go https://localhost:1443
+        200 OK
+        Hello world!
+
+    подключить TLSclient.go к https.go - тоже зачет
+    $ go run TLSclient.go https://localhost:1443  
+        200 OK
+        This is an example HTTPS server!
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Стандартный Go-пакет net
+
+    TCP- или UDP-клиент либо сервер, необходим пакет net
+    для подключения к сети функция net.Dial(), 
+    для сервера — функция net.Listen()
+    net.Dial(), и net.Listen() — возвращают значение типа net.Conn
+    этот тип реализует интерфейсы io.Reader и io.Writer
+
+----------------------------------------------------------
+----------------------------------------------------------
+TCP-клиент    TCPclient.go
+
+    CONNECT := arguments[1]
+	c, err := net.Dial("tcp", CONNECT)
+
+    Допустимые значения для первого параметра — tcp, tcp4 (только для IPv4), 
+    tcp6 (только для IPv6), udp, udp4 (только для IPv4), udp6 (только для IPv6), 
+    ip, ip4 (только для IPv4), ip6 (только для IPv6), unix (UNIX-сокеты), 
+    unixgram и unixpacket
+
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print(">> ")
+		text, _ := reader.ReadString('\n')
+		fmt.Fprintf(c, text+"\n")
+
+		message, _ := bufio.NewReader(c).ReadString('\n')
+		fmt.Print("->: " + message)
+		if strings.TrimSpace(string(text)) == "STOP" {
+			fmt.Println("TCP client exiting...")
+			return
+		}
+	}
+
+    протестируем TCPclient.go TCP-сервером с использованием netcat(1)
+
+    $ nc -l 127.0.0.1 8001
+        Hello from TCPclient.go!
+        Hi from nc!
+        STOP
+        STOP
+
+    $ go run TCPclient.go localhost:8001
+        >> Hello from TCPclient.go!
+        ->: Hi from nc!
+        >> STOP
+        ->: STOP
+        TCP client exiting...
+
+----------------------------------------------------------
+Другая версия TCP-клиента    otherTCPclient.go
+
+	CONNECT := arguments[1]
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", CONNECT)
+
+    Функция net.ResolveTCPAddr() возвращает адрес конечной точки TCP (тип TCPAddr) и 
+    может использоваться только для сетей TCP
+
+	conn, err := net.DialTCP("tcp4", nil, tcpAddr)
+
+    Функция net.DialTCP() эквивалентна функции net.Dial(), только для сетей TCP
+
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print(">> ")
+		text, _ := reader.ReadString('\n')
+		fmt.Fprintf(conn, text+"\n")
+
+		message, _ := bufio.NewReader(conn).ReadString('\n')
+		fmt.Print("->: " + message)
+		if strings.TrimSpace(string(text)) == "STOP" {
+			fmt.Println("TCP client exiting...")
+			conn.Close()
+			return
+		}
+	}
+
+    $ nc -l 127.0.0.1 8001
+        Hello from otherTCPclient.go!
+        Hi from netcat!
+        STOP
+        STOP
+
+    $ go run otherTCPclient.go localhost:8001
+        >> Hello from otherTCPclient.go!
+        ->: Hi from netcat!
+        >> STOP
+        ->: STOP
+        TCP client exiting...
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+TCP-сервер    TCPserver.go
+
+	PORT := ":" + arguments[1]
+	l, err := net.Listen("tcp", PORT)
+	defer l.Close()
+
+    Функция net.Listen() прослушивает соединения. 
+    Если ее второй аргумент не содержит IP-адрес, а только номер порта, 
+    то net.Listen() будет прослушивать все доступные IP-адреса локального компьютера
+
+	c, err := l.Accept()
+
+    Функция Accept() ожидает следующего соединения и возвращает порождающую переменную Conn
+
+	for {
+		netData, err := bufio.NewReader(c).ReadString('\n')
+		if strings.TrimSpace(string(netData)) == "STOP" {
+			fmt.Println("Exiting TCP server!")
+			return
+		}
+		fmt.Print("-> ", string(netData))
+		t := time.Now()
+		myTime := t.Format(time.RFC3339) + "\n"
+		c.Write([]byte(myTime))
+	}
+
+    $ go run TCPserver.go 8001
+        -> HELLO
+        Exiting TCP server!
+
+    $ nc 127.0.0.1 8001
+        HELLO
+        2024-02-18T19:35:10+03:00
+        STOP
+
+----------------------------------------------------------
+Другая версия TCP-сервера    otherTCPserver.go
+
+    этот TCP-сервер реализует сервис Echo, который просто возвращает
+    клиенту те же данные, которые были отправлены им
+
+	SERVER := "localhost" + ":" + arguments[1]
+	s, err := net.ResolveTCPAddr("tcp", SERVER)
+	l, err := net.ListenTCP("tcp", s)
+
+    Функция net.ListenTCP() — это эквивалент функции net.Listen() для сетей TCP
+
+	buffer := make([]byte, 1024)
+	conn, err := l.Accept()
+	for {
+		n, err := conn.Read(buffer)
+		if strings.TrimSpace(string(buffer[0:n])) == "STOP" {
+			fmt.Println("Exiting TCP server!")
+			conn.Close()
+			return
+		}
+		fmt.Print("> ", string(buffer[0:n-1]))
+		_, err = conn.Write(buffer)
+	}
+
+    $ go run otherTCPserver.go 8001
+        > Hello!
+        > Hi!
+        Exiting TCP server!
+
+    $ go run otherTCPclient.go localhost:8001
+        >> Hello!
+        ->: Hello!
+        >> Hi!
+        ->: Hi!
+        >> STOP
+        ->: TCP client exiting...
+
+    чтобы узнать, какой процесс использует TCP-порт с номером 8001, 
+    нужно выполнить следующую команду:
+
+    $ sudo lsof -n -i :8001
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+UDP-клиент    UDPclient.go
+
+    Главное различие между протоколами UDP и TCP состоит в том, что про-
+    токол UDP ненадежен. Это также означает, что в целом UDP проще, чем
+    TCP, поскольку UDP не должен сохранять состояние UDP-соединения.
+    Другими словами, работа UDP похожа на самонаводящуюся ракету, что
+    в некоторых случаях идеально подходит
+
+	CONNECT := arguments[1]
+	s, err := net.ResolveUDPAddr("udp4", CONNECT)
+	c, err := net.DialUDP("udp4", nil, s)
+	fmt.Printf("The UDP server is %s\n", c.RemoteAddr().String())
+	defer c.Close()
+
+    Функция net.ResolveUDPAddr() возвращает адрес конечной точки UDP, который 
+    определяется ее вторым параметром. Первый параметр (udp4) указывает на
+    то, что программа поддерживает только протокол IPv4.
+    Использованная здесь функция net.DialUDP() представляет собой аналог
+    net.Dial() для сетей UDP
+
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print(">> ")
+		text, _ := reader.ReadString('\n')
+		data := []byte(text + "\n")
+		_, err = c.Write(data)
+		if strings.TrimSpace(string(data)) == "STOP" {
+			fmt.Println("Exiting UDP client!")
+			return
+		}
+		buffer := make([]byte, 1024)
+		n, _, err := c.ReadFromUDP(buffer)
+		fmt.Printf("Reply: %s\n", string(buffer[0:n]))
+	}
+
+    $ nc -v -u -l 127.0.0.1 8001   // UDP server
+        Hello!
+        Hi there!
+        STOP
+
+    $ go run UDPclient.go localhost:8001
+        The UDP server is 127.0.0.1:8001
+        >> Hello!
+        Reply: Hi there!
+        >> STOP
+        Exiting UDP client!
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Разработка UDP-сервера    UDPserver.go
+
+	PORT := ":" + arguments[1]
+	s, err := net.ResolveUDPAddr("udp4", PORT)
+	connection, err := net.ListenUDP("udp4", s)
+	defer connection.Close()
+	buffer := make([]byte, 1024)
+	rand.Seed(time.Now().Unix())
+
+    Функция net.ListenUDP() — это аналог функции net.ListenTCP() для UDP-сетей
+
+	for {
+		n, addr, err := connection.ReadFromUDP(buffer)
+		fmt.Print("-> ", string(buffer[0:n-1]))
+		if strings.TrimSpace(string(buffer[0:n])) == "STOP" {
+			fmt.Println("Exiting UDP server!")
+			return
+		}
+		data := []byte(strconv.Itoa(random(1, 1001)))
+		fmt.Printf("data: %s\n", string(data))
+		_, err = connection.WriteToUDP(data, addr)
+	}
+
+    Функция ReadFromUDP() позволяет считывать данные из UDP-соедине­ ния используя 
+    буфер, который, как и следовало ожидать, является байтовым срезом
+
+    $ go run UDPserver.go 8001
+        -> Hello!
+        data: 567
+        -> STOP
+        Exiting UDP server!
+
+    $ go run UDPclient.go localhost:8001
+        The UDP server is 127.0.0.1:8001
+        >> Hello!
+        Reply: 567
+        >> STOP
+        Exiting UDP client!
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Конкурентный TCP-сервер    fiboTCP.go
+
+    Для каждого входящего соединения с TCP-сервером программа будет 
+    запускать новую горутину, которая и будет обрабатывать этот запрос.
+    Это позволит серверу принимать больше запросов. Следовательно, 
+    конкурентный TCP-сервер сможет обслуживать несколько клиентов одновременно.
+
+    func handleConnection(c net.Conn) {
+        for {
+            netData, err := bufio.NewReader(c).ReadString('\n')
+            temp := strings.TrimSpace(string(netData))
+            if temp == "STOP" {
+                break
+            }
+            fibo := "-1\n"
+            n, err := strconv.Atoi(temp)
+            if err == nil {
+                fibo = strconv.Itoa(f(n)) + "\n"
+            }
+            c.Write([]byte(string(fibo)))
+        }
+        time.Sleep(5 * time.Second)
+        c.Close()
+    }
+
+	PORT := ":" + arguments[1]
+	l, err := net.Listen("tcp4", PORT)
+	defer l.Close()
+
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		go handleConnection(c)
+	}
+
+    $ go run fiboTCP.go 9000               // наш конкурентный сервер
+
+    $ go run TCPclient.go localhost:9000   // 1 клиент
+        >> 12
+        ->: 144
+        >> STOP
+        ->: TCP client exiting...
+
+    $ nc localhost 9000                    // 2 клиент
+        10
+        55
+        STOP
+
+    Когда клиент отправляет процессу сервера строку STOP, горутина, которая
+    обслуживает этот TCP-клиент, прекращает работу, что приводит к завершению
+    соединения.
+    Оба клиента обслуживаются одновременно. Проверяем с помощью следующей команды
+
+    $ netstat -anp TCP | grep 9000
+        tcp4       0      0  127.0.0.1.9000         127.0.0.1.49464        ESTABLISHED
+        tcp4       0      0  127.0.0.1.49464        127.0.0.1.9000         ESTABLISHED
+        tcp4       0      0  127.0.0.1.9000         127.0.0.1.49460        ESTABLISHED
+        tcp4       0      0  127.0.0.1.49460        127.0.0.1.9000         ESTABLISHED
+        tcp4       0      0  *.9000                 *.*                    LISTEN     
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Удобный конкурентный TCP-сервер    kvTCP.go
 
 
 
@@ -63,4 +474,10 @@ HTTPS-клиент    httpsClient.go
 
 
 
-Стр. 643
+
+
+
+
+
+
+Стр. 662

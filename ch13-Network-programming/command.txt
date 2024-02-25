@@ -462,6 +462,204 @@ UDP-клиент    UDPclient.go
 ----------------------------------------------------------
 Удобный конкурентный TCP-сервер    kvTCP.go
 
+    type myElement struct {
+        Name    string
+        Surname string
+        Id      string
+    }
+    var DATA = make(map[string]myElement)
+    var DATAFILE = "/tmp/dataFile.gob"
+
+    func handleConnection(c net.Conn) {
+        c.Write([]byte("Welcome to the Key Value store!\n"))
+        for {
+            netData, err := bufio.NewReader(c).ReadString('\n')
+            command := strings.TrimSpace(string(netData))
+            tokens := strings.Fields(command)
+            switch len(tokens) {
+            case 0:
+                continue
+            case 1:
+                tokens = append(tokens, "")
+                tokens = append(tokens, "")
+                tokens = append(tokens, "")
+                tokens = append(tokens, "")
+            ...
+            case 4:
+                tokens = append(tokens, "")
+            }
+
+            switch tokens[0] {
+            case "STOP": ...
+            case "PRINT": ...
+            case "DELETE": ...
+            case "ADD": ...
+            case "LOOKUP": ...
+            case "CHANGE": ...
+            }
+        }
+    }
+
+    func main() {
+        arguments := os.Args
+        PORT := ":" + arguments[1]
+        l, err := net.Listen("tcp", PORT)
+        defer l.Close()
+        for {
+            c, err := l.Accept()
+            go handleConnection(c)
+        }
+    }
+
+    $ go run kvTCP.go 9000
+        Loading /tmp/dataFile.gob
+        Empty key/value store!
+        open /tmp/dataFile.gob: no such file or directory
+        Saving /tmp/dataFile.gob
+        remove /tmp/dataFile.gob: no such file or directory
+        Saving /tmp/dataFile.gob
+        Saving /tmp/dataFile.gob
+
+    $ nc localhost 9000
+        Welcome to the Key Value store!
+        PRINT
+        LOOKUP 1
+        Did not find key!
+        ADD 1 2 3 4
+        Add operation successful!
+        LOOKUP 1
+        {2 3 4}
+        ADD 4 -1 -2 -3
+        Add operation successful!
+        PRINT
+        key: 1 value: {2 3 4}
+        key: 4 value: {-1 -2 -3}
+        STOP
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Создание образа Docker для TCP/IP-сервера на Go    Docker/Dockerfile  kvTCP.go
+
+    запускаем из приложений Docker
+
+    создаем образ Docker:
+    $ docker build -t kvtcp:latest .
+        [+] Building 22.2s (10/10) FINISHED
+
+    команда docker images убедиться, что создали желаемый образ Docker:
+    $ docker images
+        kvtcp    latest    b2868199faae   12 minutes ago   872MB
+
+    Теперь выполним этот образ Docker. Указываем дополнительные параметры для предоставления 
+    номера портов, которые мы хотим сделать доступными извне:Последняя команда открывает 
+    порт 80 из образа Docker для локального компьютера с помощью порта 5801 локального компьютера
+    $ docker run -d -p 5801:80 kvtcp:latest
+        7f3e4ce1b2b67c32b078ee57d10260efac70f4e00968cedf7320e354b8cf7b65
+
+    Теперь сможем применить TCP-сервер, расположенный в образе Docker, так:
+    $ nc 127.0.0.1 5801
+        Welcome to the Key Value store!
+
+
+    если вы попытаетесь снова назначить порт с номером 80, то получите следующее 
+    сообщение об ошибке:
+    $ docker run -d -p 5801:80 kvtcp:latest
+        709d44be8668284b101d7dfc253938d13e6797d812821838aa5ab18ea48527ec
+        docker: Error response from daemon: driver failed programming external
+        connectivity on endpoint eager_nobel
+
+    есть возможность обойти это
+    ограничение, которую можно проиллюстрировать с помощью следующей команды:
+    $ docker run -d -p 5801:80 -p 2000:80 kvtcp:latest
+        5cbb17c5bbf720eaa5ce0f1e11cc73dbe5bef3cc925b7936ae1b97e245d54ae8
+
+    создается отображение номера порта 80 из образа Docker на два внешних 
+    TCP-порта (5801 и 2000). Здесь работает только один сервер kvTCP и существует 
+    только одна копия данных, несмотря на то что эти данные доступны через несколько 
+    портов. Можем это проверить с помощью команды docker ps:
+    $ docker ps
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Дистанционный вызов процедур    sharedRPC.go
+
+    Remote Procedure Call, RPC — это клиент-серверный механизм для межпроцессного 
+    взаимодействия, применяющий протокол TCP/IP. RPC-клиент и RPC-сервер
+
+    $ mkdir -p ~/go/src/sharedRPC               //
+    $ cp sharedRPC.go ~/go/src/sharedRPC/       // никак, пути не те, не сработало
+    $ go install sharedRPC                      //
+
+    $ sudo mkdir -p /usr/local/go/src/sharedRPC
+    $ sudo cp sharedRPC.go /usr/local/go/src/sharedRPC/
+    $ go install sharedRPC
+
+----------------------------------------------------------
+RPC-клиент    RPCclient.go
+
+    rpc.Dial() вместо net.Dial()
+
+    $ go run RPCclient.go localhost:1234
+        dial tcp [::1]:1234: connect: connection refused
+
+----------------------------------------------------------
+RPC-сервер    RPCserver.go
+
+    функция rpc.Register() делает эту программу RPC-сервером
+
+    $ go run RPCserver.go
+        127.0.0.1:52836
+
+    $ go run RPCclient.go localhost:1234
+        Reply (Multiply): -8.000000
+        Reply (Power): 0.250000
+
+    rmdir название_папки — удалить пустую папку.
+    rm -R название_папки — удалить папку со всем её содержимым.
+    $ sudo rm -R /usr/local/go/src/sharedRPC
+
+
+----------------------------------------------------------
+----------------------------------------------------------
+Низкоуровневое сетевое программирование   lowLevel.go
+
+    Структура http.Transport дает возможность изменять различные 
+    низкоуровневые параметры сетевого соединения
+
+    lowLevel.go перехватывает пакеты интернет-протокола управления 
+    сообщениями ICMP (Internet Control Message Protocol), которые используют 
+    протокол IPv4, и выводит их содержимое. В целях безопасности для доступа 
+    к необработанным сетевым данным необходимы привилегии пользователя root
+
+	netaddr, err := net.ResolveIPAddr("ip4", "127.0.0.1")
+	conn, err := net.ListenIP("ip4:icmp", netaddr)
+	buffer := make([]byte, 1024)
+	n, _, err := conn.ReadFrom(buffer)
+	fmt.Printf("% X\n", buffer[0:n])
+
+    Протокол ICMP используется в утилитах ping(1) и traceroute(1)
+
+    $ ping -c 5 localhost
+    $ sudo go run lowLevel.go
+        00 00 27 F5 E9 0F 00 00 65 DB 11 C0 00 07 8C 55 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 17 
+        18 19 1A 1B 1C 1D 1E 1F 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F 30 31 32 33 34 35 36 37
+
+    $ traceroute localhost
+    $ sudo go run lowLevel.go
+        03 03 15 CB 00 00 00 00 45 00 34 00 90 17 00 00 01 11 
+        00 00 7F 00 00 01 7F 00 00 01 90 16 82 9B 00 20 00 00
+
+    апустить lowLevel.go на компьютере с Debian Linux:
+    $ uname -a
+    # go run lowLevel.go
+
+----------------------------------------------------------
+Получение необработанных сетевых данных ICMP    syscallNet.go
+
+    пакет syscall
+    syscall.SetsockoptInt()
 
 
 
@@ -470,14 +668,4 @@ UDP-клиент    UDPclient.go
 
 
 
-
-
-
-
-
-
-
-
-
-
-Стр. 662
+Стр. 676

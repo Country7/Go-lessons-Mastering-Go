@@ -658,14 +658,33 @@ RPC-сервер    RPCserver.go
 ----------------------------------------------------------
 Получение необработанных сетевых данных ICMP    syscallNet.go
 
-    пакет syscall
-    syscall.SetsockoptInt()
+    пакет syscall - перехватывать необработанные сетевые данные ICMP
+    syscall.SetsockoptInt() - устанавливать параметры сокета
+
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
+	f := os.NewFile(uintptr(fd), "captureICMP")
+
+    // syscall.AF_INET сообщает функции syscall.Socket(), 
+        что мы будем работать с протоколом IPv4
+        syscall.SOCK_RAW — что должен быть сгенерирован необработанный сокет
+        syscall.IPPROTO_ICMP - что нас интересует только ICMP-трафик
+
+	err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 256)
+
+    // syscall.SetsockoptInt() определяет размер буфера приема сокета – 256
+        syscall.SOL_SOCKET указывает на то, что мы работаем на уровне сокетов
+
+	for {
+		buf := make([]byte, 1024)
+		numRead, err := f.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Printf("% X\n", buf[:numRead])
+	}
+
+    $ sudo go run syscallNet.go    // macOS
 
 
 
-
-
-
-
-
-Стр. 676
+Стр. 682
